@@ -390,7 +390,12 @@ fun ProductListScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    com.expiryguard.app.ui.components.StatusBadge(status = status)
+                    if (product.isCompleted) {
+                        // 已处理标签
+                        com.expiryguard.app.ui.components.StatusBadgeCompleted()
+                    } else {
+                        com.expiryguard.app.ui.components.StatusBadge(status = status)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -912,8 +917,8 @@ private fun GridProductCard(
         }
     }
 
-    val statusColor = remember(status) {
-        when (status) {
+    val statusColor = remember(status, product.isCompleted) {
+        if (product.isCompleted) Green500 else when (status) {
             is ProductStatus.Safe -> Green500
             is ProductStatus.ExpiringSoon -> Yellow500
             is ProductStatus.Returnable -> Blue500
@@ -968,6 +973,17 @@ private fun GridProductCard(
                     color = daysColor,
                     fontWeight = FontWeight.SemiBold
                 )
+
+                // 已处理标记
+                if (product.isCompleted) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "✓ 已处理",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Green500,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             // 选中指示器

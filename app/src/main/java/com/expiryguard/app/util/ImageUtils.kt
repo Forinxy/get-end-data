@@ -27,19 +27,53 @@ object ImageUtils {
     }
 
     /**
-     * 从 Uri 保存图片到应用内部存储
+     * 从 Uri 保存图片到应用内部存储（自动压缩到 maxSize 以内）
+     *
+     * 压缩逻辑：
+     * 1. 读取原图尺寸（inJustDecodeBounds，不加载像素）
+     * 2. 计算 2 的幂采样率，使宽高缩小到 maxSize 以内
+     * 3. 按采样率解码后以 JPEG 90 质量保存
+     *
+     * 相比直接复制原图，可大幅降低磁盘占用与解码内存，减少列表卡顿。
      *
      * @return 保存后的图片绝对路径，失败返回 null
      */
-    fun saveImage(context: Context, uri: Uri): String? {
+    fun saveImage(context: Context, uri: Uri, maxSize: Int = 1080): String? {
         return try {
+            // 第一步：读取原图尺寸信息（不加载像素）
             val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeStream(inputStream, null, options)
+            inputStream.close()
+
+            val outWidth = options.outWidth
+            val outHeight = options.outHeight
+            if (outWidth <= 0 || outHeight <= 0) return null
+
+            // 计算采样率，使图片缩小到 maxSize 以内
+            var sampleSize = 1
+            while (outWidth / sampleSize > maxSize || outHeight / sampleSize > maxSize) {
+                sampleSize *= 2
+            }
+
+            // 第二步：按采样率解码
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+            }
+            val inputStream2 = context.contentResolver.openInputStream(uri) ?: return null
+            val bitmap = BitmapFactory.decodeStream(inputStream2, null, decodeOptions)
+            inputStream2.close()
+            if (bitmap == null) return null
+
+            // 第三步：保存压缩后的图片
             val fileName = "${UUID.randomUUID()}.jpg"
             val file = File(getImageDir(context), fileName)
             FileOutputStream(file).use { output ->
-                inputStream.copyTo(output)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
             }
-            inputStream.close()
+            bitmap.recycle()
             file.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()

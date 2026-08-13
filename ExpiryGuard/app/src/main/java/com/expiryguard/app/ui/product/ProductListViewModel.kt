@@ -8,6 +8,7 @@ import com.expiryguard.app.domain.engine.ExpiryRuleEngine
 import com.expiryguard.app.domain.model.ProductStatus
 import com.expiryguard.app.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -71,18 +72,24 @@ class ProductListViewModel @Inject constructor(
 
     /**
      * 加载所有活跃清单，并在数据变化时重新应用筛选和搜索条件
+     * 过滤计算在 Default 线程执行，避免阻塞主线程
      */
     private fun loadProducts() {
         viewModelScope.launch {
-            repository.getAllActiveProducts().collect { products ->
-                _uiState.update { state ->
+            repository.getAllActiveProducts()
+                .map { products ->
+                    val state = _uiState.value
+                    val today = DateUtils.todayTimestamp()
                     state.copy(
                         products = products,
-                        filteredProducts = applyFilter(products, state.currentFilter, state.searchQuery),
+                        filteredProducts = applyFilter(products, state.currentFilter, state.searchQuery, today),
                         isLoading = false
                     )
                 }
-            }
+                .flowOn(Dispatchers.Default)
+                .collect { newState ->
+                    _uiState.value = newState
+                }
         }
     }
 
@@ -92,10 +99,9 @@ class ProductListViewModel @Inject constructor(
     private fun applyFilter(
         products: List<ProductEntity>,
         filter: ProductFilter,
-        query: String
+        query: String,
+        today: Long
     ): List<ProductEntity> {
-        val today = DateUtils.todayTimestamp()
-
         // 先按筛选条件过滤
         val filtered = when (filter) {
             ProductFilter.ALL -> products
@@ -165,9 +171,10 @@ class ProductListViewModel @Inject constructor(
      */
     fun setInitialFilter(filter: ProductFilter) {
         _uiState.update { state ->
+            val today = DateUtils.todayTimestamp()
             state.copy(
                 currentFilter = filter,
-                filteredProducts = applyFilter(state.products, filter, state.searchQuery)
+                filteredProducts = applyFilter(state.products, filter, state.searchQuery, today)
             )
         }
     }
@@ -177,22 +184,25 @@ class ProductListViewModel @Inject constructor(
      */
     fun setFilter(filter: ProductFilter) {
         _uiState.update { state ->
+            val today = DateUtils.todayTimestamp()
             state.copy(
                 currentFilter = filter,
-                filteredProducts = applyFilter(state.products, filter, state.searchQuery)
+                filteredProducts = applyFilter(state.products, filter, state.searchQuery, today)
             )
         }
     }
 
     /**
-     * 更新搜索关键词
+     * 更新搜索关键词（在 Default 线程执行过滤，避免输入时阻塞主线程）
      */
     fun setSearchQuery(query: String) {
-        _uiState.update { state ->
-            state.copy(
-                searchQuery = query,
-                filteredProducts = applyFilter(state.products, state.currentFilter, query)
-            )
+        viewModelScope.launch(Dispatchers.Default) {
+            val state = _uiState.value
+            val today = DateUtils.todayTimestamp()
+            val filtered = applyFilter(state.products, state.currentFilter, query, today)
+            _uiState.update {
+                it.copy(searchQuery = query, filteredProducts = filtered)
+            }
         }
     }
 

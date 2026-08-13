@@ -10,6 +10,8 @@ import java.time.format.DateTimeFormatter
  */
 object DateUtils {
 
+    // 缓存时区与 formatter，避免频繁调用 systemDefault() 的开销
+    private val zoneId: ZoneId = ZoneId.systemDefault()
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val shortDateFormatter = DateTimeFormatter.ofPattern("MM/dd")
 
@@ -41,7 +43,7 @@ object DateUtils {
      */
     fun toLocalDate(timestamp: Long): LocalDate {
         return Instant.ofEpochMilli(timestamp)
-            .atZone(ZoneId.systemDefault())
+            .atZone(zoneId)
             .toLocalDate()
     }
 
@@ -50,7 +52,7 @@ object DateUtils {
      */
     fun toTimestamp(localDate: LocalDate): Long {
         return localDate
-            .atStartOfDay(ZoneId.systemDefault())
+            .atStartOfDay(zoneId)
             .toInstant()
             .toEpochMilli()
     }

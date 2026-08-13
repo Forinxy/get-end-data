@@ -23,11 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.expiryguard.app.data.db.entity.ProductEntity
 import com.expiryguard.app.domain.model.ProductStatus
 import com.expiryguard.app.ui.theme.Blue500
@@ -105,7 +107,10 @@ fun ProductCard(
                 // 清单缩略图
                 if (product.photoPath != null) {
                     AsyncImage(
-                        model = product.photoPath,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(product.photoPath)
+                            .size(128)
+                            .build(),
                         contentDescription = product.name,
                         modifier = Modifier
                             .size(64.dp)

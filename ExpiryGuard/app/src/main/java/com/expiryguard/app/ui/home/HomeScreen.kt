@@ -5,18 +5,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
@@ -48,11 +51,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.expiryguard.app.data.db.entity.ProductEntity
 import com.expiryguard.app.domain.engine.ExpiryRuleEngine
 import com.expiryguard.app.domain.model.ProductStatus
@@ -65,6 +71,7 @@ import com.expiryguard.app.ui.theme.Gray500
 import com.expiryguard.app.ui.theme.Green500
 import com.expiryguard.app.ui.theme.Orange500
 import com.expiryguard.app.ui.theme.Red500
+import com.expiryguard.app.ui.theme.Red700
 import com.expiryguard.app.ui.theme.Yellow500
 import com.expiryguard.app.util.DateUtils
 import java.time.LocalDate
@@ -79,7 +86,7 @@ private fun statusToColor(status: ProductStatus): Color {
         is ProductStatus.ExpiringSoon -> Yellow500
         is ProductStatus.Returnable -> Blue500
         is ProductStatus.Urgent -> Red500
-        is ProductStatus.Expired -> Gray500
+        is ProductStatus.Expired -> Red700
     }
 }
 
@@ -140,30 +147,31 @@ fun HomeScreen(
             }
         } else {
             GradientBackground {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // 顶部：日期 + 问候语
-                    GreetingSection()
+                    item { GreetingSection() }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
 
                     // 搜索栏
-                    SearchBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        onSearch = {
-                            onNavigateToProductList(searchQuery, "ALL")
-                        }
-                    )
+                    item {
+                        SearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onSearch = {
+                                onNavigateToProductList(searchQuery, "ALL")
+                            }
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    item { Spacer(modifier = Modifier.height(12.dp)) }
 
                     // 今日待办任务列表 —— 今天到期 + 还剩1天的预警清单
-                    TodayTasksSection(
+                    todayTasksSection(
                         todayExpiry = uiState.todayExpiry,
                         warning = uiState.warning,
                         completedProducts = uiState.completedProducts,
@@ -344,10 +352,10 @@ private fun SearchBar(
  * 今日待办区域 —— 显示今天到期 + 还剩1天的预警清单
  *
  * 支持左右滑动切换完成状态（左右方向均可标记/取消标记）。
+ * 作为 LazyListScope 扩展函数在 LazyColumn 中懒加载，避免一次性渲染全部卡片。
  */
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TodayTasksSection(
+private fun LazyListScope.todayTasksSection(
     todayExpiry: List<ProductEntity>,
     warning: List<ProductEntity>,
     completedProducts: List<ProductEntity>,
@@ -359,7 +367,8 @@ private fun TodayTasksSection(
         .distinctBy { it.id }
         .sortedBy { it.expiryDate }
 
-    Column {
+    // 今日待办标题行
+    item(key = "today_header") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -387,10 +396,11 @@ private fun TodayTasksSection(
                 }
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (todayTasks.isEmpty() && completedProducts.isEmpty()) {
+    if (todayTasks.isEmpty() && completedProducts.isEmpty()) {
+        // 空状态
+        item(key = "today_empty") {
             GlassCard(
                 shape = RoundedCornerShape(14.dp),
                 elevation = 2.dp
@@ -402,47 +412,53 @@ private fun TodayTasksSection(
                     modifier = Modifier.padding(24.dp)
                 )
             }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 今天到期的未处理清单 + 预警
-                val unfinished = todayTasks.filter { !it.isCompleted }
-                if (unfinished.isNotEmpty()) {
-                    unfinished.forEach { product ->
-                        key(product.id) {
-                            TaskCard(
-                                product = product,
-                                isCompleted = false,
-                                onSwipeComplete = {
-                                    onTaskCompleted(product.id, true)
-                                },
-                                onClick = { onTaskClick(product) }
-                            )
-                        }
-                    }
-                }
+        }
+    } else {
+        // 今天到期的未处理清单 + 预警（懒加载，仅渲染可见项）
+        val unfinished = todayTasks.filter { !it.isCompleted }
+        items(
+            items = unfinished,
+            key = { it.id }
+        ) { product ->
+            TaskCard(
+                product = product,
+                isCompleted = false,
+                onSwipeComplete = {
+                    onTaskCompleted(product.id, true)
+                },
+                onClick = { onTaskClick(product) }
+            )
+        }
 
-                // 已处理（今天处理过的记录）
-                if (completedProducts.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+        // 已处理（今天处理过的记录）
+        if (completedProducts.isNotEmpty()) {
+            item(key = "completed_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "已处理",
                         style = MaterialTheme.typography.titleSmall,
                         color = Green500,
                         fontWeight = FontWeight.Medium
                     )
-                    completedProducts.sortedByDescending { it.expiryDate }.forEach { product ->
-                        key(product.id) {
-                            TaskCard(
-                                product = product,
-                                isCompleted = true,
-                                onSwipeComplete = {
-                                    onTaskCompleted(product.id, false)
-                                },
-                                onClick = { onTaskClick(product) }
-                            )
-                        }
-                    }
                 }
+            }
+            items(
+                items = completedProducts.sortedByDescending { it.expiryDate },
+                key = { it.id }
+            ) { product ->
+                TaskCard(
+                    product = product,
+                    isCompleted = true,
+                    onSwipeComplete = {
+                        onTaskCompleted(product.id, false)
+                    },
+                    onClick = { onTaskClick(product) }
+                )
             }
         }
     }
@@ -460,7 +476,8 @@ private fun TaskCard(
     onClick: () -> Unit
 ) {
     val productStatus = remember { ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate) }
-    val statusColor = statusToColor(productStatus)
+    // 已处理时用绿色压过原始状态色
+    val statusColor = if (isCompleted) Green500 else statusToColor(productStatus)
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -500,94 +517,119 @@ private fun TaskCard(
                 elevation = 2.dp,
                 statusColor = statusColor
             ) {
-                Box {
-                    Row(
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // 左侧状态色条 — 4dp 宽，与卡片等高
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 清单图片
-                        AsyncImage(
-                            model = product.photoPath,
-                            contentDescription = product.name,
+                            .width(4.dp)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                            .background(statusColor.copy(alpha = 0.8f))
+                    )
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        Row(
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        // 清单信息
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = product.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = if (isCompleted)
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                else
-                                    MaterialTheme.colorScheme.onSurface
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 清单图片
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(product.photoPath)
+                                    .size(128)
+                                    .build(),
+                                contentDescription = product.name,
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentScale = ContentScale.Crop
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
 
-                            val today = DateUtils.todayTimestamp()
-                            val daysLeft = DateUtils.daysBetween(today, product.expiryDate)
-                            val daysText = when {
-                                productStatus is ProductStatus.Returnable -> {
-                                    val r = productStatus as ProductStatus.Returnable
-                                    val returnDeadlineDays = (r.remainingDays - r.threshold).coerceAtLeast(0)
-                                    if (returnDeadlineDays > 0) {
-                                        "可退货 · 剩余退货${returnDeadlineDays}天 · 到期还有${r.remainingDays}天"
-                                    } else {
-                                        "可退货 · 到期还有${r.remainingDays}天"
-                                    }
+                            // 清单信息
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = product.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = if (isCompleted)
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                val today = remember { DateUtils.todayTimestamp() }
+                                val daysLeft = remember(today, product.expiryDate) {
+                                    DateUtils.daysBetween(today, product.expiryDate)
                                 }
-                                daysLeft < 0 -> "已过期 ${-daysLeft}天"
-                                daysLeft == 0 -> "今天到期"
-                                daysLeft == 1 -> "明天到期（预警）"
-                                else -> "剩余 ${daysLeft}天"
+                                val daysText = when {
+                                    productStatus is ProductStatus.Returnable -> {
+                                        val r = productStatus as ProductStatus.Returnable
+                                        val returnDeadlineDays = (r.remainingDays - r.threshold).coerceAtLeast(0)
+                                        if (returnDeadlineDays > 0) {
+                                            "可退货 · 剩余退货${returnDeadlineDays}天 · 到期还有${r.remainingDays}天"
+                                        } else {
+                                            "可退货 · 到期还有${r.remainingDays}天"
+                                        }
+                                    }
+                                    daysLeft < 0 -> "已过期 ${-daysLeft}天"
+                                    daysLeft == 0 -> "今天到期"
+                                    daysLeft == 1 -> "明天到期（预警）"
+                                    else -> "剩余 ${daysLeft}天"
+                                }
+                                val daysColor = when {
+                                    productStatus is ProductStatus.Returnable -> Blue500
+                                    daysLeft < 0 -> Red500
+                                    daysLeft <= 1 -> Orange500
+                                    daysLeft <= 3 -> Yellow500
+                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                }
+
+                                Text(
+                                    text = "到期: ${DateUtils.formatDate(product.expiryDate)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                Text(
+                                    text = daysText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = daysColor,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                            val daysColor = when {
-                                productStatus is ProductStatus.Returnable -> Blue500
-                                daysLeft < 0 -> Red500
-                                daysLeft <= 1 -> Orange500
-                                daysLeft <= 3 -> Yellow500
-                                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+
+                            // 状态标签：已处理时显示绿色"已处理"，否则显示原始状态
+                            if (isCompleted) {
+                                StatusBadgeCompleted()
+                            } else {
+                                StatusBadge(status = productStatus)
                             }
+                        }
 
-                            Text(
-                                text = "到期: ${DateUtils.formatDate(product.expiryDate)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = daysText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = daysColor,
-                                fontWeight = FontWeight.SemiBold
+                        // 完成标记
+                        if (isCompleted) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "已完成",
+                                tint = Green500,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(8.dp)
+                                    .size(24.dp)
                             )
                         }
-                    }
-
-                    // 完成标记
-                    if (isCompleted) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "已完成",
-                            tint = Green500,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(8.dp)
-                                .size(24.dp)
-                        )
                     }
                 }
             }
@@ -647,7 +689,10 @@ private fun ProductDetailSheet(
         // 清单图片（如果有）
         if (product.photoPath != null) {
             AsyncImage(
-                model = product.photoPath,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(product.photoPath)
+                    .size(720)
+                    .build(),
                 contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -803,6 +848,56 @@ private fun DetailInfoRow(
             style = MaterialTheme.typography.bodyMedium,
             color = valueColor,
             fontWeight = if (valueColor != MaterialTheme.colorScheme.onSurface) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
+}
+
+/**
+ * 已处理状态标签 — 绿色"已处理"压过原始过期/紧急标记
+ */
+@Composable
+private fun StatusBadgeCompleted() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Green500.copy(alpha = 0.18f))
+            .border(
+                width = 1.dp,
+                color = Green500.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        // 左侧色条
+        Box(
+            modifier = Modifier
+                .width(2.dp)
+                .height(16.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(Green500.copy(alpha = 0.85f))
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        // 发光圆点
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(Green500.copy(alpha = 0.4f))
+        )
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(Green500.copy(alpha = 0.9f))
+                .align(Alignment.CenterVertically)
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = "已处理",
+            color = Green500.copy(alpha = 0.95f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

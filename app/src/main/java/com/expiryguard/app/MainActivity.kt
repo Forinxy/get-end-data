@@ -21,9 +21,11 @@ import com.expiryguard.app.notification.NotificationHelper
 import com.expiryguard.app.ui.theme.ExpiryGuardTheme
 import com.expiryguard.app.util.DateUtils
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -44,46 +46,51 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // 启动时检查待处理清单，发送通知
+        // 查询与过滤在 IO 线程执行，避免阻塞首帧渲染
         lifecycleScope.launch {
             try {
-                val notificationEnabled = dataStore.data.first()[KEY_NOTIFICATION_ENABLED] ?: true
+                val notificationEnabled = withContext(Dispatchers.IO) {
+                    dataStore.data.first()[KEY_NOTIFICATION_ENABLED] ?: true
+                }
                 if (notificationEnabled) {
-                    val products = repository.getAllActiveProducts().first()
-                    val today = DateUtils.todayTimestamp()
+                    withContext(Dispatchers.IO) {
+                        val products = repository.getAllActiveProducts().first()
+                        val today = DateUtils.todayTimestamp()
 
-                    // 待处理：今日到期 + 可退货 + 预警（还剩1天）
-                    val todayExpiry = products.filter {
-                        DateUtils.isToday(it.expiryDate) && !it.isCompleted
-                    }
-                    val returnable = products.filter { product ->
-                        val status = ExpiryRuleEngine.calculateStatus(
-                            product.shelfLifeDays, product.expiryDate
-                        )
-                        status is ProductStatus.Returnable && !product.isCompleted
-                    }
-                    val warning = products.filter {
-                        val days = DateUtils.daysBetween(today, it.expiryDate)
-                        days == 1 && !it.isCompleted
-                    }
+                        // 待处理：今日到期 + 可退货 + 预警（还剩1天）
+                        val todayExpiry = products.filter {
+                            DateUtils.isToday(it.expiryDate) && !it.isCompleted
+                        }
+                        val returnable = products.filter { product ->
+                            val status = ExpiryRuleEngine.calculateStatus(
+                                product.shelfLifeDays, product.expiryDate
+                            )
+                            status is ProductStatus.Returnable && !product.isCompleted
+                        }
+                        val warning = products.filter {
+                            val days = DateUtils.daysBetween(today, it.expiryDate)
+                            days == 1 && !it.isCompleted
+                        }
 
-                    // 合并去重
-                    val pendingIds = (todayExpiry.map { it.id } +
-                            returnable.map { it.id } +
-                            warning.map { it.id }).toSet()
+                        // 合并去重
+                        val pendingIds = (todayExpiry.map { it.id } +
+                                returnable.map { it.id } +
+                                warning.map { it.id }).toSet()
 
-                    val pendingCount = pendingIds.size
-                    val returnableCount = returnable.size
-                    val expiredCount = products.count {
-                        DateUtils.daysBetween(today, it.expiryDate) <= 0 && !it.isCompleted
-                    }
+                        val pendingCount = pendingIds.size
+                        val returnableCount = returnable.size
+                        val expiredCount = products.count {
+                            DateUtils.daysBetween(today, it.expiryDate) <= 0 && !it.isCompleted
+                        }
 
-                    if (pendingCount > 0) {
-                        NotificationHelper.sendPendingNotification(
-                            this@MainActivity,
-                            pendingCount,
-                            returnableCount,
-                            expiredCount
-                        )
+                        if (pendingCount > 0) {
+                            NotificationHelper.sendPendingNotification(
+                                this@MainActivity,
+                                pendingCount,
+                                returnableCount,
+                                expiredCount
+                            )
+                        }
                     }
                 }
             } catch (_: Exception) {

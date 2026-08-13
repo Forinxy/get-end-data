@@ -11,8 +11,10 @@ import com.expiryguard.app.data.repository.ProductRepository
 import com.expiryguard.app.util.DateUtils
 import com.expiryguard.app.util.ImageUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -163,7 +165,9 @@ class EditProductViewModel @Inject constructor(
     fun pickImage(uri: Uri) {
         val context = getApplication<Application>()
         viewModelScope.launch {
-            val savedPath = ImageUtils.saveImage(context, uri)
+            val savedPath = withContext(Dispatchers.IO) {
+                ImageUtils.saveImage(context, uri)
+            }
             if (savedPath != null) {
                 _uiState.update { it.copy(photoPath = savedPath) }
             } else {

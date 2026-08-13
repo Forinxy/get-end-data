@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -56,6 +57,9 @@ import com.expiryguard.app.util.ImageUtils
 import java.io.File
 import java.net.URLDecoder
 import java.net.URLEncoder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 路由定义
@@ -129,18 +133,26 @@ fun AppNavigation() {
 
     // ========== 相机相关状态与 Launcher ==========
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val cameraScope = lifecycleOwner.lifecycleScope
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && cameraImageUri != null) {
-            val savedPath = ImageUtils.saveImage(context, cameraImageUri!!)
-            val route = if (savedPath != null) {
-                "add_product?photoPath=${Uri.encode(savedPath)}"
-            } else {
-                Screen.AddProduct.route
+            val uri = cameraImageUri!!
+            // 压缩保存在 IO 线程执行，避免阻塞主线程
+            cameraScope.launch(Dispatchers.IO) {
+                val savedPath = ImageUtils.saveImage(context, uri)
+                withContext(Dispatchers.Main) {
+                    val route = if (savedPath != null) {
+                        "add_product?photoPath=${Uri.encode(savedPath)}"
+                    } else {
+                        Screen.AddProduct.route
+                    }
+                    navController.navigate(route)
+                }
             }
-            navController.navigate(route)
         } else {
             navController.navigate(Screen.AddProduct.route)
         }

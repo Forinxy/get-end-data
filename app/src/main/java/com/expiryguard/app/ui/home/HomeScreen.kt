@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,10 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
@@ -49,12 +51,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.expiryguard.app.data.db.entity.ProductEntity
 import com.expiryguard.app.domain.engine.ExpiryRuleEngine
 import com.expiryguard.app.domain.model.ProductStatus
@@ -143,30 +147,31 @@ fun HomeScreen(
             }
         } else {
             GradientBackground {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // 顶部：日期 + 问候语
-                    GreetingSection()
+                    item { GreetingSection() }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
 
                     // 搜索栏
-                    SearchBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        onSearch = {
-                            onNavigateToProductList(searchQuery, "ALL")
-                        }
-                    )
+                    item {
+                        SearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onSearch = {
+                                onNavigateToProductList(searchQuery, "ALL")
+                            }
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    item { Spacer(modifier = Modifier.height(12.dp)) }
 
                     // 今日待办任务列表 —— 今天到期 + 还剩1天的预警清单
-                    TodayTasksSection(
+                    todayTasksSection(
                         todayExpiry = uiState.todayExpiry,
                         warning = uiState.warning,
                         completedProducts = uiState.completedProducts,
@@ -347,10 +352,10 @@ private fun SearchBar(
  * 今日待办区域 —— 显示今天到期 + 还剩1天的预警清单
  *
  * 支持左右滑动切换完成状态（左右方向均可标记/取消标记）。
+ * 作为 LazyListScope 扩展函数在 LazyColumn 中懒加载，避免一次性渲染全部卡片。
  */
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TodayTasksSection(
+private fun LazyListScope.todayTasksSection(
     todayExpiry: List<ProductEntity>,
     warning: List<ProductEntity>,
     completedProducts: List<ProductEntity>,
@@ -362,7 +367,8 @@ private fun TodayTasksSection(
         .distinctBy { it.id }
         .sortedBy { it.expiryDate }
 
-    Column {
+    // 今日待办标题行
+    item(key = "today_header") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -390,10 +396,11 @@ private fun TodayTasksSection(
                 }
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (todayTasks.isEmpty() && completedProducts.isEmpty()) {
+    if (todayTasks.isEmpty() && completedProducts.isEmpty()) {
+        // 空状态
+        item(key = "today_empty") {
             GlassCard(
                 shape = RoundedCornerShape(14.dp),
                 elevation = 2.dp
@@ -405,47 +412,53 @@ private fun TodayTasksSection(
                     modifier = Modifier.padding(24.dp)
                 )
             }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 今天到期的未处理清单 + 预警
-                val unfinished = todayTasks.filter { !it.isCompleted }
-                if (unfinished.isNotEmpty()) {
-                    unfinished.forEach { product ->
-                        key(product.id) {
-                            TaskCard(
-                                product = product,
-                                isCompleted = false,
-                                onSwipeComplete = {
-                                    onTaskCompleted(product.id, true)
-                                },
-                                onClick = { onTaskClick(product) }
-                            )
-                        }
-                    }
-                }
+        }
+    } else {
+        // 今天到期的未处理清单 + 预警（懒加载，仅渲染可见项）
+        val unfinished = todayTasks.filter { !it.isCompleted }
+        items(
+            items = unfinished,
+            key = { it.id }
+        ) { product ->
+            TaskCard(
+                product = product,
+                isCompleted = false,
+                onSwipeComplete = {
+                    onTaskCompleted(product.id, true)
+                },
+                onClick = { onTaskClick(product) }
+            )
+        }
 
-                // 已处理（今天处理过的记录）
-                if (completedProducts.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+        // 已处理（今天处理过的记录）
+        if (completedProducts.isNotEmpty()) {
+            item(key = "completed_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "已处理",
                         style = MaterialTheme.typography.titleSmall,
                         color = Green500,
                         fontWeight = FontWeight.Medium
                     )
-                    completedProducts.sortedByDescending { it.expiryDate }.forEach { product ->
-                        key(product.id) {
-                            TaskCard(
-                                product = product,
-                                isCompleted = true,
-                                onSwipeComplete = {
-                                    onTaskCompleted(product.id, false)
-                                },
-                                onClick = { onTaskClick(product) }
-                            )
-                        }
-                    }
                 }
+            }
+            items(
+                items = completedProducts.sortedByDescending { it.expiryDate },
+                key = { it.id }
+            ) { product ->
+                TaskCard(
+                    product = product,
+                    isCompleted = true,
+                    onSwipeComplete = {
+                        onTaskCompleted(product.id, false)
+                    },
+                    onClick = { onTaskClick(product) }
+                )
             }
         }
     }
@@ -525,7 +538,10 @@ private fun TaskCard(
                         ) {
                             // 清单图片
                             AsyncImage(
-                                model = product.photoPath,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(product.photoPath)
+                                    .size(128)
+                                    .build(),
                                 contentDescription = product.name,
                                 modifier = Modifier
                                     .size(64.dp)
@@ -551,8 +567,10 @@ private fun TaskCard(
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
-                                val today = DateUtils.todayTimestamp()
-                                val daysLeft = DateUtils.daysBetween(today, product.expiryDate)
+                                val today = remember { DateUtils.todayTimestamp() }
+                                val daysLeft = remember(today, product.expiryDate) {
+                                    DateUtils.daysBetween(today, product.expiryDate)
+                                }
                                 val daysText = when {
                                     productStatus is ProductStatus.Returnable -> {
                                         val r = productStatus as ProductStatus.Returnable
@@ -671,7 +689,10 @@ private fun ProductDetailSheet(
         // 清单图片（如果有）
         if (product.photoPath != null) {
             AsyncImage(
-                model = product.photoPath,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(product.photoPath)
+                    .size(720)
+                    .build(),
                 contentDescription = product.name,
                 modifier = Modifier
                     .fillMaxWidth()

@@ -72,6 +72,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.expiryguard.app.ui.components.DatePickerDialog
 import com.expiryguard.app.ui.components.GlassCard
 import com.expiryguard.app.ui.components.GradientBackground
@@ -766,7 +767,10 @@ private fun PhotoSection(
     ) {
         if (photoPath != null) {
             AsyncImage(
-                model = photoPath,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoPath)
+                    .size(1080)
+                    .build(),
                 contentDescription = "清单图片预览",
                 modifier = Modifier
                     .fillMaxSize()

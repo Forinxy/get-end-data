@@ -8,6 +8,7 @@ import com.expiryguard.app.domain.engine.ExpiryRuleEngine
 import com.expiryguard.app.domain.model.ProductStatus
 import com.expiryguard.app.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -70,32 +71,44 @@ class HomeViewModel @Inject constructor(
      */
     private fun loadData() {
         viewModelScope.launch {
-            repository.getAllActiveProducts().collect { products ->
-                processProducts(products)
-            }
+            repository.getAllActiveProducts()
+                // 过滤、排序、去重等计算在 Default 线程执行，避免阻塞主线程
+                .map { products ->
+                    val today = DateUtils.todayTimestamp()
+                    processProducts(products, today)
+                }
+                .flowOn(Dispatchers.Default)
+                .collect { state ->
+                    _uiState.value = state
+                    _isRefreshing.value = false
+                }
         }
     }
 
     /**
      * 处理清单列表并更新 UI 状态
+     * 在 Default 线程执行，主线程只负责接收结果
      */
-    private fun processProducts(products: List<ProductEntity>) {
-        val today = DateUtils.todayTimestamp()
-
+    private fun processProducts(products: List<ProductEntity>, today: Long): HomeUiState {
         // 今日到期：到期日期是今天
         val todayExpiry = products.filter {
             DateUtils.isToday(it.expiryDate) && !it.isCompleted
         }
 
         // 可退货清单：根据规则1，到期前阈值天时放入待办
-        // 直接用 ExpiryRuleEngine 判断，避免绕路匹配分组
         val returnable = products.filter { product ->
             val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
             status is ProductStatus.Returnable && !product.isCompleted
         }
 
-        // 今日到期（含可退货）—— 合并去重
-        val todayWithReturnable = (todayExpiry + returnable).distinctBy { it.id }
+        // 已过期：到期日期已过，需要立即处理
+        val expired = products.filter {
+            val days = DateUtils.daysBetween(today, it.expiryDate)
+            days < 0 && !it.isCompleted
+        }
+
+        // 今日到期（含可退货、已过期）—— 合并去重
+        val todayWithReturnable = (todayExpiry + returnable + expired).distinctBy { it.id }
 
         // 预警：还有1天到期（排除已在今日待办中的清单）
         val todayWithReturnableIds = todayWithReturnable.map { it.id }.toSet()
@@ -104,8 +117,14 @@ class HomeViewModel @Inject constructor(
             days == 1 && !it.isCompleted && it.id !in todayWithReturnableIds
         }
 
-        // 已处理：已完成的清单
-        val completed = products.filter { it.isCompleted }
+        // 已处理：仅保留今日到期、预警、已过期或可退货的已完成清单
+        val completed = products.filter { product ->
+            if (!product.isCompleted) return@filter false
+            val days = DateUtils.daysBetween(today, product.expiryDate)
+            if (days <= 1) return@filter true
+            val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
+            status is ProductStatus.Returnable
+        }
 
         // 待处理：剩下的未完成清单（排除今日到期、可退货、预警）
         val todayAndWarningIds = (todayWithReturnable.map { it.id } + warning.map { it.id }).toSet()
@@ -116,7 +135,7 @@ class HomeViewModel @Inject constructor(
         // 最近添加：按创建时间降序取前5个
         val recent = products.sortedByDescending { it.createdAt }.take(5)
 
-        _uiState.value = HomeUiState(
+        return HomeUiState(
             todayExpiry = todayWithReturnable,
             warning = warning,
             completedProducts = completed,
@@ -129,7 +148,6 @@ class HomeViewModel @Inject constructor(
             totalCount = products.size,
             isLoading = false
         )
-        _isRefreshing.value = false
     }
 
     /**

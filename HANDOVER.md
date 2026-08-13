@@ -1,26 +1,26 @@
-# 过期管家 (ExpiryGuard) — 项目交接文档
+# 过期管家 (ExpiryGuard) 项目交接文档
 
-> 最后更新：2026-07-29  
-> 版本：1.0.0 (versionCode=1)  
-> 源码位置：[待补充: Git 仓库地址]  
-> 当前 commit：[待补充: 项目非 Git 仓库，无法获取 commit 哈希]
+> 最后更新：2026-08-13
+> 版本：1.0.0 (versionCode=1)
+> 源码仓库：`https://github.com/Forinxy/get-end-data`（私有仓库）
+> 基础 commit：`641aa64`（本次交接含未推送的性能优化补丁，推送后 commit 会更新）
+> 交接包产出：HANDOVER.md / ExpiryGuard_源码.zip / ExpiryGuard_1.0.0_debug.apk
 
 ---
 
 ## 1. 项目概述
 
-**过期管家** 是一款 Android 原生应用，帮助用户管理物品保质期，到期前自动提醒退货/处理，避免食品和日用品过期浪费。
+**过期管家** 是一款完全离线的 Android 原生应用，帮助用户记录商品保质期、到期自动提醒，避免食品和日用品过期浪费。应用数据全部存储在本地 Room 数据库，无需网络与后端。
 
 | 维度 | 详情 |
 |------|------|
-| 应用名 | 过期管家 |
-| 包名 | `com.expiryguard.app` |
-| 技术栈 | Kotlin 2.0.21 + Jetpack Compose (Material3) |
-| 架构模式 | MVVM + Hilt 依赖注入 + Room 本地数据库 |
-| minSdk | 26 (Android 8.0) |
-| targetSdk / compileSdk | 35 |
-| UI 风格 | 毛玻璃拟态 (Glassmorphism)，支持浅色/深色主题 + Android 12+ Monet 动态取色 |
-| 离线能力 | 完全离线，无需网络，无后端 |
+| 应用名 | 过期管家 (ExpiryGuard) |
+| 包名 / applicationId | `com.expiryguard.app` |
+| 技术栈 | Kotlin 2.0.21 + Jetpack Compose (Material3) + Hilt + Room + MVVM |
+| 架构模式 | MVVM + Hilt 依赖注入 + Room 本地数据库 + StateFlow |
+| minSdk / targetSdk / compileSdk | 26 (Android 8.0) / 35 / 35 |
+| UI 风格 | 毛玻璃拟态 (Glassmorphism)，支持浅/深色 + Android 12+ Monet 动态取色 |
+| 离线能力 | 完全离线，无后端、无第三方账号 |
 
 ---
 
@@ -32,75 +32,114 @@
 |------|---------|---------|
 | 操作系统 | macOS / Windows / Linux | — |
 | JDK | **17** | `java -version` |
-| Android SDK | API 35 (Android 15) | `sdkmanager --list` |
-| Gradle | **8.9**（由 wrapper 自动下载） | `./gradlew --version` |
-| Android Studio | Hedgehog (2023.1.1) 或更新 | 打开项目自动检测 |
+| Android SDK | Platform 35 + Build Tools 35.0.0 | `sdkmanager --list` |
+| Gradle | **8.9**（wrapper 自动下载） | `./gradlew --version` |
+| AGP | 8.7.0（`build.gradle.kts` 声明） | — |
+| Kotlin | 2.0.21（含 Compose 编译器插件） | — |
 
 ### 2.2 环境变量
 
 | 变量 | 说明 |
 |------|------|
 | `ANDROID_HOME` | Android SDK 路径，如 `~/Android/Sdk` |
-| `JAVA_HOME` | JDK 17 安装路径（如 `JAVA_HOME` 未设，Gradle 自动检测） |
+| `JAVA_HOME` | JDK 17 安装路径 |
+| `sdk.dir` | 可在项目根 `local.properties` 中设置（`sdk.dir=/opt/android-sdk`） |
 
-### 2.3 第三方账号/密钥
+### 2.3 第三方 Key
 
-**无需任何第三方账号或 API 密钥。** 应用完全离线运行，所有数据存储在本地 Room 数据库中。
-
-如未来需要接入：
-- 云同步功能 → [待补充: 选择后端方案]
-- 条形码扫描识别 → [待补充: 选择 OCR/扫码 API]
+**无需任何第三方 API 密钥。** 应用完全离线运行，无后端、无推送服务商、无地图/支付/广告 SDK。
 
 ---
 
 ## 3. 构建运行
 
-### 3.1 从零构建（精确步骤）
+### 3.1 从零构建 Debug APK（复制粘贴即可执行）
 
 ```bash
-# 1. 克隆仓库（如为 Git 仓库）
-git clone [待补充: 仓库地址]
-cd ExpiryGuard
+# 1. 克隆仓库（需要 GitHub 账号有该私有仓库权限）
+git clone https://github.com/Forinxy/get-end-data.git
+cd get-end-data
 
 # 2. 确认 JDK 17
 java -version
-# 预期：openjdk version "17.0.x" ...
 
-# 3. 设置 Android SDK 路径（如未自动检测）
+# 3. 设置 SDK 路径（如未自动检测）
 export ANDROID_HOME=~/Android/Sdk
-# 或在项目根目录创建 local.properties 文件：
-# echo "sdk.dir=$ANDROID_HOME" > local.properties
+echo "sdk.dir=$ANDROID_HOME" > local.properties
 
 # 4. 构建 Debug APK
 ./gradlew assembleDebug
 
-# 5. 安装到设备
+# 5. 产出路径
+#    app/build/outputs/apk/debug/app-debug.apk
+
+# 6. 安装到设备
 adb install app/build/outputs/apk/debug/app-debug.apk
-
-# 6. 或在 Android Studio 中直接 Run
-# 打开项目 → 选择 Run 'app' (Shift+F10)
 ```
 
-### 3.2 已知构建注意事项
+### 3.2 已知坑与解法
 
-1. **Gradle 镜像源**：`settings.gradle.kts` 中配置了阿里云镜像，在国内网络下构建更快。海外环境可删除镜像配置，使用默认 Google/Maven Central。
-2. **内存限制**：`gradle.properties` 中 `org.gradle.jvmargs=-Xmx1536m`。低内存机器（<4GB RAM）可能需降低此值。
-3. **并行构建已关闭**：`org.gradle.parallel=false`，构建缓存也关闭，首次构建较慢（约 2-5 分钟）。
-4. **KSP**：项目使用 KSP 而非 KAPT 进行 Room 和 Hilt 的注解处理，编译速度更快。
-5. **Gradle Wrapper 使用腾讯云镜像**：`gradle-wrapper.properties` 中 `distributionUrl` 指向腾讯云。如不可用，改回官方 `https://services.gradle.org/distributions/gradle-8.9-bin.zip`。
+1. **首次构建较慢**：需下载 Gradle 8.9 发行版 + 全部依赖（阿里云镜像），约 5-15 分钟，属正常现象。
+2. **构建报 SDK Build-Tools 34 缺失**：AGP 会自动通过 sdkmanager 安装，需确认网络可达 `dl.google.com`；或手动执行 `sdkmanager "build-tools;34.0.0"`。
+3. **`gradlew: Permission denied`**：`chmod +x gradlew` 后重试。
+4. **内存不足**：`gradle.properties` 中 `org.gradle.jvmargs=-Xmx1536m`，低内存机器可进一步调低；CI 中已用 `-Xmx2048m` 覆盖。
+5. **镜像失效**：`settings.gradle.kts` 配置了阿里云镜像，若失效可删除镜像配置回退官方 Google/Maven Central。
 
-### 3.3 构建 Release APK
+### 3.3 GitHub Actions 自动构建
 
-```bash
-./gradlew assembleRelease
-# 注意：当前未配置签名，需在 app/build.gradle.kts 中添加 signingConfigs
-```
+- **脚本路径**：`.github/workflows/build-apk.yml`
+- **触发方式**：
+  - push 到 `main` / `master` 分支
+  - 创建 pull request
+  - 手动触发：仓库 Actions 页 → Build APK → Run workflow
+- **产物**：Debug APK（`app-debug.apk`）与未签名 Release APK（`app-release-unsigned.apk`），作为 workflow artifact 提供下载。
+- 本地验证：`chmod +x gradlew && ./gradlew assembleDebug` 已在本机通过（BUILD SUCCESSFUL，约 13 分钟）。
 
 ---
 
-## 4. 开发进度
+## 4. 依赖与镜像
 
-### 4.1 已完成
+### 4.1 主要依赖
+
+| 依赖 | 版本 | 用途 |
+|------|------|------|
+| androidx.compose:compose-bom | 2024.10.01 | Compose 全家桶 |
+| androidx.room | 2.6.1 | 本地数据库 |
+| com.google.dagger:hilt-android | 2.51.1 | 依赖注入 |
+| androidx.navigation:navigation-compose | 2.8.3 | 导航 |
+| io.coil-kt:coil-compose | 2.7.0 | 图片加载 |
+| com.patrykandpatrick.vico:compose | 2.0.0-beta.2 | 统计图表 |
+| androidx.datastore:datastore-preferences | 1.1.1 | 偏好存储 |
+| androidx.work:work-runtime-ktx | 2.9.1 | 后台任务（暂未实现 Worker） |
+| com.google.code.gson | 2.11.0 | JSON 序列化 |
+
+### 4.2 镜像配置
+
+`settings.gradle.kts` 已内置阿里云镜像（优先于官方源）：
+
+| 官方源 | 镜像地址 |
+|--------|----------|
+| Google Maven | `https://maven.aliyun.com/repository/google` |
+| Maven Central | `https://maven.aliyun.com/repository/public` |
+| Gradle 插件 | `https://maven.aliyun.com/repository/gradle-plugin` |
+
+Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.properties`）：
+`https://mirrors.cloud.tencent.com/gradle/gradle-8.9-bin.zip`
+
+**获取优先级**：本地缓存 → 国内镜像（已配置）→ 官方源 → 手动下载。
+本工程所有依赖均从公开镜像可获取，无需 GitHub 代理或手动下载。
+
+---
+
+## 5. 本地依赖服务
+
+**无需任何本地/远程服务。** 无后端、无数据库服务器、无 Redis、无消息队列。应用数据保存在设备本地 Room 数据库中，直接安装运行即可完整使用。
+
+---
+
+## 6. 开发进度
+
+### 6.1 已完成
 
 | 功能 | 状态 | 说明 |
 |------|:---:|------|
@@ -112,50 +151,58 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 | 统计页 | ✅ | 状态分布、到期趋势、分类统计图表（Vico 图表库） |
 | 分类管理 | ✅ | 自定义分类，支持颜色 |
 | 回收站 | ✅ | 软删除→恢复/永久删除 |
-| 设置页 | ✅ | 深色模式/Monet 取色/通知开关/提醒天数/自动清理 |
+| 设置页 | ✅ | 深色模式/Monet 取色/通知开关/提醒天数/自动清理（UI） |
 | 数据备份恢复 | ✅ | 导出 CSV/JSON，备份到本地文件，从文件恢复 |
 | 通知提醒 | ✅ | 启动时检查待处理清单发送通知，支持测试通知 |
 | 毛玻璃 UI | ✅ | 浅色/深色主题，自适应，毛玻璃拟态风格 |
-| 状态标记视觉 | ✅ | 左侧彩色竖条 + StatusBadge 标签，已处理用绿色压过原始状态 |
 
-### 4.2 进行中
+### 6.2 本次性能优化补丁（2026-08-13）
 
-| 功能 | 说明 |
+| 优化项 | 说明 |
 |------|------|
-| 状态标记调优 | 根据用户反馈持续调整过期/安全/可退货等标记的视觉表现 |
+| 首页列表懒加载 | `Column + verticalScroll` → `LazyColumn`，任务卡片改为 `items` 懒加载，消除任务多时一次性渲染卡顿 |
+| 图片保存压缩 | `ImageUtils.saveImage` 改为采样压缩（默认最大 1080px）后保存，替代原图直拷贝 |
+| Coil 加载限尺寸 | 列表缩略图 `.size(128)`，详情/编辑图 `.size(720/1080)`，降低解码内存与 IO |
+| 图片 IO 移线程 | 拍照保存、`pickImage` 改为 `Dispatchers.IO` 执行，避免阻塞主线程 |
+| 主线程计算迁移 | `HomeViewModel` / `ProductListViewModel` 过滤计算移至 `Dispatchers.Default` |
+| 启动开销优化 | `MainActivity` 通知检查的 DB 查询与过滤移至 IO 线程 |
+| DateUtils 优化 | 缓存 `ZoneId`，避免每次调用 `systemDefault()` |
 
-### 4.3 已搁置 / 未开始
+### 6.3 进行中 / 已搁置
 
-| 功能 | 说明 |
-|------|------|
-| 条形码扫描 | 已声明 CAMERA 权限和 CameraX 依赖，但扫描功能未实现 |
-| 定时后台通知 | 依赖 WorkManager 已引入，但未实现定时到期提醒 |
-| 自动清理 | 设置中已有 UI 配置（autoCleanupDays），但未实现自动清理逻辑 |
-| 云同步 | 未规划 |
-| 小组件 (Widget) | 未规划 |
-| 多语言 | 当前仅中文 |
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 状态标记调优 | 进行中 | 根据反馈调整过期/安全/可退货标记视觉（ExpiryGuard/ 子目录为旧版备份） |
+| 条形码扫描 | 已搁置 | 已声明 CAMERA 权限和 CameraX 依赖，但扫描功能未实现 |
+| 定时后台通知 | 已搁置 | 已引入 WorkManager，但未实现定时 Worker |
+| 自动清理 | 已搁置 | 设置中已有 UI 配置，未实现自动清理逻辑 |
+| 云同步 / 小组件 / 多语言 | 已搁置 | 未规划 |
+
+### 6.4 最近可运行 commit
+
+`641aa64`（根目录工程，含性能优化补丁后可直接构建）。注意：仓库根目录存在 `ExpiryGuard/` 子目录，为较早版本的整体备份（ProductCard 视觉不同），主工程以根目录为准。
 
 ---
 
-## 5. 待开发内容 (Backlog)
+## 7. 待开发内容 (Backlog)
 
-| 优先级 | 功能 | 估算工作量 | 依赖 |
+| 优先级 | 功能 | 估算工作量 | 前置依赖 |
 |:---:|------|:---:|------|
 | P0 | 定时后台通知（WorkManager 定期检查到期清单并推送） | 3-5 天 | 无 |
-| P1 | 条形码扫描识别（CameraX + ML Kit 或 ZXing） | 5-7 天 | 需选择扫码方案 |
+| P1 | 条形码扫描识别（CameraX + ML Kit 或 ZXing） | 5-7 天 | 选择扫码方案 |
 | P1 | 自动清理过期清单 | 2-3 天 | 无 |
 | P2 | 产品名称自动填充（取代默认"清单"名称） | 1-2 天 | 无 |
-| P2 | 批量导入（从 CSV/JSON 恢复时支持合并而非覆盖） | 2-3 天 | 无 |
-| P2 | 多语言支持（至少英文） | 3-5 天 | 需提取 strings.xml |
+| P2 | 批量导入（CSV/JSON 恢复支持合并而非覆盖） | 2-3 天 | 无 |
+| P2 | 多语言支持（至少英文） | 3-5 天 | 提取 strings.xml |
 | P3 | 桌面小组件 (App Widget) | 5-7 天 | 无 |
 | P3 | 分类统计图表交互优化 | 2-3 天 | 无 |
 | P3 | 产品照片编辑/裁剪 | 2-3 天 | 无 |
 
 ---
 
-## 6. 架构与关键模块
+## 8. 架构与关键模块
 
-### 6.1 项目结构
+### 8.1 项目结构
 
 ```
 app/src/main/java/com/expiryguard/app/
@@ -165,139 +212,189 @@ app/src/main/java/com/expiryguard/app/
 │   ├── db/
 │   │   ├── entity/             # Room 实体：ProductEntity, CategoryEntity, ShelfLifeGroupEntity
 │   │   ├── dao/                # DAO 接口：ProductDao, CategoryDao, ShelfLifeGroupDao
-│   │   └── AppDatabase.kt     # Room 数据库（v3），单例模式
+│   │   └── AppDatabase.kt     # Room 数据库（v3）+ 默认分组初始化
 │   └── repository/
-│       └── ProductRepository.kt # 数据仓库，封装所有 DAO 操作，返回 Result<T>
+│       └── ProductRepository.kt # 数据仓库，封装所有 DAO 操作
 ├── di/
-│   ├── AppModule.kt           # Hilt 模块：提供 DataStore<Preferences>
-│   └── DatabaseModule.kt      # Hilt 模块：提供 Room DB、DAO、Repository
+│   ├── AppModule.kt           # Hilt：提供 DataStore<Preferences>
+│   └── DatabaseModule.kt      # Hilt：提供 Room DB、DAO、Repository
 ├── domain/
-│   ├── engine/
-│   │   └── ExpiryRuleEngine.kt # 到期规则引擎（单例 object）
-│   └── model/
-│       └── ProductStatus.kt   # 密封类：Safe/ExpiringSoon/Returnable/Urgent/Expired
-├── navigation/
-│   └── AppNavigation.kt       # 路由定义 + 底部导航栏 + 相机集成
-├── notification/
-│   └── NotificationHelper.kt  # 通知渠道创建 + 测试通知 + 待办提醒
+│   ├── engine/ExpiryRuleEngine.kt  # 到期规则引擎（单例 object）
+│   └── model/ProductStatus.kt      # 密封类：Safe/ExpiringSoon/Returnable/Urgent/Expired
+├── navigation/AppNavigation.kt     # 路由 + 底部导航 + 相机集成
+├── notification/NotificationHelper.kt # 通知渠道 + 待办提醒
 ├── ui/
-│   ├── components/            # 可复用组件：ProductCard, StatusBadge, GlassCard, StatCard, DatePicker, EmptyState
+│   ├── components/            # GlassCard/ProductCard/StatusBadge/StatCard/DatePicker/EmptyState
 │   ├── home/                  # 首页：HomeScreen + HomeViewModel
-│   ├── product/               # 清单：Add/Edit/Detail/List + 对应 ViewModel
-│   ├── settings/              # 设置：Settings, BackupRestore, CategoryManagement, ShelfLifeGroupManagement, NotificationSettings, About
+│   ├── product/               # 清单：Add/Edit/Detail/List + ViewModel
+│   ├── settings/              # 设置相关 6 个页面
 │   ├── stats/                 # 统计：StatsScreen + StatsViewModel
-│   ├── theme/                 # 主题：Color, Theme, Type
+│   ├── theme/                 # 主题：Color/Theme/Type
 │   └── trash/                 # 回收站：TrashScreen + TrashViewModel
 └── util/
-    ├── DateUtils.kt           # 日期工具（java.time API）
-    └── ImageUtils.kt          # 图片保存工具
+    ├── DateUtils.kt           # 日期工具（java.time，缓存 ZoneId）
+    └── ImageUtils.kt          # 图片保存/压缩/删除
 ```
 
-### 6.2 核心入口
+### 8.2 核心入口
 
 | 入口 | 文件 | 职责 |
 |------|------|------|
 | Application | `ExpiryGuardApp.kt` | Hilt 入口，创建通知渠道 |
-| Activity | `MainActivity.kt` | 加载 DataStore 偏好 → 初始化主题 → 渲染 `AppNavigation` |
-| 导航 | `AppNavigation.kt` | 12 个路由，4 Tab 底部导航，相机拍照回调 |
+| Activity | `MainActivity.kt` | 加载 DataStore 偏好 → 初始化主题 → 渲染 `AppNavigation`；启动通知检查在 IO 线程 |
+| 导航 | `AppNavigation.kt` | 12+ 路由，4 Tab 底部导航，相机拍照回调（IO 线程压缩保存） |
 
-### 6.3 数据流
+### 8.3 数据流
 
 ```
 UI (Compose Screen)
   ↑ collectAsState()
 ViewModel (Hilt @HiltViewModel)
-  ↑ Flow
+  ↑ Flow（filter/sort 在 Dispatchers.Default）
 ProductRepository (单例, @Inject)
   ↑ Flow / suspend fun → Result<T>
 Room DAO (ProductDao, CategoryDao, ShelfLifeGroupDao)
   ↑
-Room Database (AppDatabase, v3, 单例)
+Room Database (AppDatabase, v3, Hilt 单例)
 ```
 
-### 6.4 到期规则引擎
+### 8.4 到期规则引擎
 
-`ExpiryRuleEngine.calculateStatus(shelfLifeDays, expiryDate)` 判定逻辑：
-
+`ExpiryRuleEngine.calculateStatus(shelfLifeDays, expiryDate)` 判定优先级：
 1. `remainingDays <= 0` → `Expired(daysOverdue)`
 2. `remainingDays <= 3` → `Urgent(remainingDays)`
 3. `remainingDays <= threshold` → `Returnable(remainingDays, threshold)`
 4. 否则 → `Safe(remainingDays)`
 
-退货阈值 (`getReturnThreshold`)：
-- 保质期 >= 365 天 → 45 天
-- 保质期 > 183 天 → 20 天
-- 保质期 >= 90 天 → 15 天
-- 保质期 < 90 天 → 0（不可退货）
+退货阈值：保质期 ≥365 天→45 天；>183 天→20 天；≥90 天→15 天；<90 天→0（不可退货）。
 
-### 6.5 首页今日待办筛选逻辑
+### 8.5 首页今日待办筛选
 
-`HomeViewModel.processProducts()` 合并四个来源：
+`HomeViewModel.processProducts()` 合并四个来源：今日到期（`isToday` + 未完成）、可退货（`Returnable` 状态）、已过期（`days<0`）、预警（`days==1`），去重后按到期日期排序。已处理区仅显示四类中已完成项。
 
-| 来源 | 条件 |
+### 8.6 已知技术债
+
+1. **`.gitignore` 缺失于仓库根**：构建产物 `build/`、`.gradle/`、`local.properties` 可能被误提交（本机已建 `local.properties`，未提交）。
+2. **ProGuard 规则不完整**：仅保留 Gson 注解，Release 混淆时 Room/Hilt/Coil 需补充规则（当前 `isMinifyEnabled=false`，无实际影响）。
+3. **WorkManager 未使用**：依赖已引入但无 Worker 实现，定时通知未完成。
+4. **产品名称固定"清单"**：`AddProductViewModel.saveProduct()` 中 `name = "清单"`，用户无法自定义名称。
+5. **`MainActivity` 通知逻辑与首页 `processProducts` 不完全一致**：前者未包含已过期项，后者包含（业务影响：启动通知数量口径略不同）。
+6. **`ExpiringSoon` 状态未被引擎返回**：密封类定义了但引擎从未产出。
+7. **数据库 v3 使用 `fallbackToDestructiveMigration`**：未来升级版本号会清空用户数据，需改为显式 Migration。
+8. **仓库存在重复工程**：根目录为主工程，`ExpiryGuard/` 为旧版备份目录，建议清理以避免混淆。
+
+---
+
+## 9. 代码概览与已知问题
+
+### 9.1 代码概览
+
+- 代码总量约 40 个 Kotlin 文件，单一 `app` 模块，无多模块拆分。
+- 使用 KSP（非 KAPT）处理 Room/Hilt，编译速度较快。
+- UI 全部为 Compose，无 XML 布局；主题为毛玻璃拟态风格。
+
+### 9.2 严重问题（需优先处理）
+
+1. **`fallbackToDestructiveMigration()`**：数据库版本一旦升级即清空全部用户数据。修复方向：改为提供显式 `Migration` 对象。
+2. **启动通知逻辑与首页待办口径不一致**：可能导致通知数量与首页展示不符。修复方向：抽取统一的计算函数（如 `ExpiryRuleEngine` 或独立工具类）供两处复用。
+
+> 其余为轻微问题（命名、重复代码、未使用依赖等），不影响稳定运行，见第 8.6 节技术债清单。
+
+---
+
+## 10. 架构简评
+
+- **架构模式**：MVVM + 单向数据流（StateFlow → Compose），分层清晰（data/domain/ui）。
+- **整体评价**：**良好**。模块职责划分合理，Hilt + Room 使用规范，数据流明确。
+- **突出问题与改进方向**：
+  1. 数据处理多处重复（首页/列表/通知各自写过滤逻辑），建议抽取领域层聚合函数统一口径。
+  2. 图片处理无统一封装，`ImageUtils` 可扩展生成缩略图 + 原图双存储策略，进一步降低列表内存。
+  3. 无 Repository 层缓存，每次状态流变化全量重算；数据量大时可引入分页（Paging 3）。
+  4. 数据库无索引、无迁移策略，需要补 Migration 方案与必要索引。
+  5. 单 Activity 单模块，功能已较多，未来可按 feature 拆分模块。
+
+---
+
+## 11. 测试建议
+
+### 11.1 核心流程（可手工验证）
+
+1. 首次启动 → 首页空状态 → 添加清单（拍照/相册 + 生产日期 + 保质期）→ 保存成功
+2. 首页出现新清单，状态色条与 StatusBadge 正确
+3. 添加过期清单 → 首页深红色过期标记 → 左滑标记完成 → 绿色"已处理"
+4. 清单列表：筛选/搜索/多选批量删除/列表↔网格切换
+5. 统计页图表渲染正常
+6. 设置页深色模式/备份恢复正常
+
+### 11.2 重点测试模块
+
+| 模块 | 重点场景 |
 |------|------|
-| 今日到期 | `isToday(expiryDate)` + 未完成 |
-| 可退货 | `Returnable` 状态 + 未完成 |
-| 已过期 | `days < 0` + 未完成 |
-| 预警 | `days == 1` + 未完成 + 不在上述列表中 |
+| 首页 HomeScreen | 大量待办（50+ 条）时上下滑动流畅度、下拉刷新、滑动标记完成 |
+| 图片加载 | 相机拍照后列表滚动时内存占用（可用 Android Studio Profiler 观察） |
+| 搜索过滤 | 输入搜索时主线程无 jank（过滤已迁移 Default 线程） |
+| 数据备份恢复 | CSV/JSON 导出 → 清数据 → 恢复一致性 |
 
-已处理区仅显示以上四类中已完成的项目。
+### 11.3 已知/可能的边界问题
 
-### 6.6 已知技术债
-
-1. **数据库实例重复创建风险**：`DatabaseModule.kt` 通过 `Room.databaseBuilder().build()` 创建数据库，而 `AppDatabase.kt` 内部有 `getInstance()` 双重检查锁单例。两者不一致，理论上可能创建两个实例。建议统一使用一种方式（推荐 Hilt 单例 + `@Provides @Singleton`）。
-
-2. **无 .gitignore**：项目根目录缺少 `.gitignore` 文件，`build/`、`.gradle/`、`local.properties` 等可能被误提交。
-
-3. **ProGuard 规则不完整**：仅保留了 Gson 注解，Room、Hilt、Coil 等库需要额外的 ProGuard 规则才能正确混淆。
-
-4. **WorkManager 未使用**：依赖已引入但无任何 Worker 实现，定时通知功能未完成。
-
-5. **产品名称固定为"清单"**：`AddProductViewModel.saveProduct()` 中 `name = "清单"`，用户无法自定义名称（除非通过编辑页修改）。
-
-6. **MainActivity 通知逻辑未同步**：`MainActivity.onCreate()` 中的待办筛选逻辑与 `HomeViewModel.processProducts()` 不一致——前者未包含已过期项，后者已包含。
-
-7. **`ExpiringSoon` 状态未使用**：`ProductStatus` 密封类定义了 `ExpiringSoon`，但 `ExpiryRuleEngine` 中从未返回此状态。
+- 图片路径为空/文件被删除时 `AsyncImage` 静默失败（显示占位背景），无崩溃风险。
+- 时区切换后 `DateUtils` 缓存 `ZoneId` 为启动时值，跨时区用户重启 App 前展示可能延迟一天更新。
+- 深色模式切换时 `GlassCard` 颜色即时更新（`isDarkTheme()` 每帧计算，开销小）。
 
 ---
 
-## 7. 账号与密钥
+## 12. 账号与密钥
 
-**无需任何账号或密钥。** 应用完全离线，无后端依赖。
+**应用完全离线，当前无需任何账号或密钥。**
 
-如未来需要接入的功能：
-- 条形码识别 API → [待补充: 选择 ML Kit 或第三方 API]
-- 云同步 → [待补充: 选择 Firebase / 自建后端]
-- 崩溃上报 → [待补充: 选择 Firebase Crashlytics 或 Sentry]
+未来若接入以下功能需自行申请（均用占位符）：
+
+| 功能 | 提供方 | 申请方式 |
+|------|--------|---------|
+| 条形码识别 | ML Kit / ZXing | 无需 Key（本地识别），或用 `<YOUR_API_KEY>`（云端方案） |
+| 云同步 | Firebase / 自建后端 | Firebase 控制台创建项目，填入 `<YOUR_GOOGLE_SERVICES_JSON>` |
+| 崩溃上报 | Firebase Crashlytics / Sentry | 官方控制台申请 `<YOUR_API_KEY>` |
 
 ---
 
-## 8. 验收标准
+## 13. 常见问题
 
-新人按以下步骤操作，全部通过即视为成功接管：
+| 问题 | 解法 |
+|------|------|
+| `Unable to locate package openjdk-17` | `apt-get update` 后重装 |
+| `./gradlew: Permission denied` | `chmod +x gradlew` |
+| 依赖下载失败（阿里云镜像不可达） | 编辑 `settings.gradle.kts` 删除镜像配置，回退官方源 |
+| Gradle 发行版下载失败 | 编辑 `gradle-wrapper.properties` 改回 `https://services.gradle.org/distributions/gradle-8.9-bin.zip` |
+| 构建报 Build-Tools 34 缺失 | `sdkmanager "build-tools;34.0.0"` 手动安装 |
+| 构建 OOM / 卡死 | 调低 `gradle.properties` 中 `-Xmx`，或关闭其他内存占用进程 |
+| 运行闪退 | 查看 `adb logcat`，重点看 Room/Hilt 初始化错误 |
 
-### 第一步：环境准备
-- [ ] JDK 17 安装并配置 `JAVA_HOME`
-- [ ] Android SDK 35 安装，`ANDROID_HOME` 配置正确
-- [ ] Android Studio 打开项目，Gradle Sync 成功（无红色报错）
+---
 
-### 第二步：构建运行
-- [ ] `./gradlew assembleDebug` 构建成功，生成 `app-debug.apk`
-- [ ] APK 安装到设备/模拟器，应用正常启动，无崩溃
+## 14. 验收标准
 
-### 第三步：功能验证
-- [ ] 首页显示空状态（"还没有清单"）
-- [ ] 点击 FAB → 添加清单页 → 选择生产日期 + 保质期 → 保存成功
-- [ ] 首页显示刚添加的清单，左侧色条和 StatusBadge 颜色正确
-- [ ] 添加一个过期清单（生产日期设为过去），首页出现深红色过期标记
-- [ ] 左滑/右滑标记完成 → 绿色"已处理"标记覆盖原状态
-- [ ] 清单列表页 → 筛选/搜索/多选/视图切换 正常
-- [ ] 统计页 → 图表正常渲染
-- [ ] 设置页 → 深色模式切换正常
-- [ ] 设置页 → 备份/恢复 正常
+- [ ] 环境：JDK 17 + Android SDK 35 配置完成，`java -version` 通过
+- [ ] 构建：`./gradlew assembleDebug` 成功，生成 `app/build/outputs/apk/debug/app-debug.apk`
+- [ ] 运行：APK 安装后正常启动到首页，无崩溃
+- [ ] 功能：添加/编辑/删除清单、状态标记、首页滑动标记完成、筛选/搜索、统计图表、备份恢复全部正常
+- [ ] 性能：首页 50+ 待办时滑动流畅（LazyColumn 生效），拍照保存不卡 UI（IO 线程 + 压缩生效）
+- [ ] CI：push 到 main/master 后，GitHub Actions `Build APK` workflow 自动构建并产出 APK artifact
+- [ ] 代码：能说出 `ExpiryRuleEngine.calculateStatus` 优先级、首页四来源合并逻辑、性能优化点（LazyColumn/图片压缩/线程迁移）
 
-### 第四步：代码理解
-- [ ] 能说出 `ExpiryRuleEngine.calculateStatus` 的判定优先级
-- [ ] 能说出首页 `todayExpiry` 的四个合并来源
-- [ ] 能指出 `DatabaseModule` 和 `AppDatabase.getInstance()` 的重复实例化问题
-- [ ] 能运行 `./gradlew assembleDebug` 并定位构建错误
+---
+
+## 附：本次修改文件清单（性能优化补丁）
+
+| 文件 | 修改内容 |
+|------|------|
+| `ui/home/HomeScreen.kt` | verticalScroll → LazyColumn；todayTasksSection 懒加载；AsyncImage 限尺寸；remember 缓存 |
+| `ui/components/ProductCard.kt` | AsyncImage 缩略图 `.size(128)` |
+| `util/ImageUtils.kt` | saveImage 采样压缩后保存 |
+| `ui/product/AddProductViewModel.kt` / `EditProductViewModel.kt` | pickImage 移 IO 线程 |
+| `navigation/AppNavigation.kt` | 拍照保存移 IO 线程 + lifecycleScope |
+| `ui/home/HomeViewModel.kt` | 过滤计算 flowOn(Default) |
+| `ui/product/ProductListViewModel.kt` | 过滤计算 Default 线程；setSearchQuery 异步 |
+| `MainActivity.kt` | 启动通知检查移 IO 线程 |
+| `util/DateUtils.kt` | 缓存 ZoneId |
+| `ui/product/ProductDetailScreen.kt` / `AddProductScreen.kt` / `EditProductScreen.kt` | AsyncImage 限尺寸 |
+| `.github/workflows/build-apk.yml` | 新增 GitHub Actions 自动构建 |
