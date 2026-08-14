@@ -44,3 +44,22 @@ jobs:
           name: app-release-apk
           path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: ignore
+
+      - name: Create GitHub Release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: ExpiryGuard v1.0.0
+          body: |
+            ExpiryGuard（过期管家）v1.0.0
+
+            ## 变更内容
+            - 首页列表改为 LazyColumn 懒加载，消除大量任务时滑动卡顿
+            - 图片保存采样压缩 + AsyncImage 加载限尺寸，降低内存占用
+            - 图片 IO 与过滤计算迁移至 IO/Default 线程，避免阻塞主线程
+            - 新增 GitHub Actions 自动构建
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          fail_on_unmatched_files: false
