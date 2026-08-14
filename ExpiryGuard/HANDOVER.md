@@ -1,10 +1,10 @@
 # 过期管家 (ExpiryGuard) 项目交接文档
 
-> 最后更新：2026-08-13
-> 版本：1.0.0 (versionCode=1)
+> 最后更新：2026-08-14
+> 版本：1.0.1 (versionCode=2)
 > 源码仓库：`https://github.com/Forinxy/get-end-data`（私有仓库）
 > 基础 commit：`641aa64`（本次交接含未推送的性能优化补丁，推送后 commit 会更新）
-> 交接包产出：HANDOVER.md / ExpiryGuard_源码.zip / ExpiryGuard_1.0.0_debug.apk
+> 交接包产出：HANDOVER.md / ExpiryGuard_源码.zip / ExpiryGuard_1.0.1_debug.apk
 
 ---
 
@@ -156,7 +156,9 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 | 通知提醒 | ✅ | 启动时检查待处理清单发送通知，支持测试通知 |
 | 毛玻璃 UI | ✅ | 浅色/深色主题，自适应，毛玻璃拟态风格 |
 
-### 6.2 本次性能优化补丁（2026-08-13）
+### 6.2 性能与交互优化补丁（2026-08-13 ~ 2026-08-14）
+
+第一轮（2026-08-13，性能修复，已推送 commit `885e97b`）：
 
 | 优化项 | 说明 |
 |------|------|
@@ -167,6 +169,17 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 | 主线程计算迁移 | `HomeViewModel` / `ProductListViewModel` 过滤计算移至 `Dispatchers.Default` |
 | 启动开销优化 | `MainActivity` 通知检查的 DB 查询与过滤移至 IO 线程 |
 | DateUtils 优化 | 缓存 `ZoneId`，避免每次调用 `systemDefault()` |
+| CI 自动构建 | 新增 `.github/workflows/build-apk.yml`，构建后自动发布 GitHub Release |
+
+第二轮（2026-08-14，本次交接，加载/区分已完成/防误触）：
+
+| 优化项 | 说明 |
+|------|------|
+| 加载显示优化 | 首页首次加载显示加载指示器（`CircularProgressIndicator`），避免白屏/空状态闪烁 |
+| 区分今日/历史已完成 | 数据库新增 `completedAt` 字段（v3→v4 显式 Migration，不清数据），首页「已处理」拆分为「今日已完成」与「之前已完成」两组，历史组最多展示 20 条避免首页过长 |
+| 防误触标记 | 滑动触发阈值从默认 50% 提高至卡片宽度 65%，轻滑不再误触发 |
+| 滑动操作可撤销 | 标记/取消完成后弹出 Snackbar 提示具体清单名，并带「撤销」按钮，误触可一键恢复 |
+| 滑动背景提示 | 未完成时背景显示绿色「滑动标记完成」，已完成时显示灰色「滑动取消完成」，操作意图清晰 |
 
 ### 6.3 进行中 / 已搁置
 
@@ -212,7 +225,7 @@ app/src/main/java/com/expiryguard/app/
 │   ├── db/
 │   │   ├── entity/             # Room 实体：ProductEntity, CategoryEntity, ShelfLifeGroupEntity
 │   │   ├── dao/                # DAO 接口：ProductDao, CategoryDao, ShelfLifeGroupDao
-│   │   └── AppDatabase.kt     # Room 数据库（v3）+ 默认分组初始化
+│   │   └── AppDatabase.kt     # Room 数据库（v4）+ 默认分组初始化 + Migration
 │   └── repository/
 │       └── ProductRepository.kt # 数据仓库，封装所有 DAO 操作
 ├── di/
@@ -255,7 +268,7 @@ ProductRepository (单例, @Inject)
   ↑ Flow / suspend fun → Result<T>
 Room DAO (ProductDao, CategoryDao, ShelfLifeGroupDao)
   ↑
-Room Database (AppDatabase, v3, Hilt 单例)
+Room Database (AppDatabase, v4, Hilt 单例)
 ```
 
 ### 8.4 到期规则引擎
@@ -280,7 +293,7 @@ Room Database (AppDatabase, v3, Hilt 单例)
 4. **产品名称固定"清单"**：`AddProductViewModel.saveProduct()` 中 `name = "清单"`，用户无法自定义名称。
 5. **`MainActivity` 通知逻辑与首页 `processProducts` 不完全一致**：前者未包含已过期项，后者包含（业务影响：启动通知数量口径略不同）。
 6. **`ExpiringSoon` 状态未被引擎返回**：密封类定义了但引擎从未产出。
-7. **数据库 v3 使用 `fallbackToDestructiveMigration`**：未来升级版本号会清空用户数据，需改为显式 Migration。
+7. **数据库迁移策略部分解决**：v3→v4 已提供显式 Migration（新增 `completedAt` 列），但仍保留 `fallbackToDestructiveMigration` 作为老版本兜底；未来每次升级都应补充显式 Migration。
 8. **仓库存在重复工程**：根目录为主工程，`ExpiryGuard/` 为旧版备份目录，建议清理以避免混淆。
 
 ---
@@ -295,7 +308,7 @@ Room Database (AppDatabase, v3, Hilt 单例)
 
 ### 9.2 严重问题（需优先处理）
 
-1. **`fallbackToDestructiveMigration()`**：数据库版本一旦升级即清空全部用户数据。修复方向：改为提供显式 `Migration` 对象。
+1. **`fallbackToDestructiveMigration()` 兜底**：数据库升级依赖显式 Migration；若未来未提供 Migration 会清空用户数据。修复方向：每次升级补充 `Migration` 对象，逐步移除兜底。
 2. **启动通知逻辑与首页待办口径不一致**：可能导致通知数量与首页展示不符。修复方向：抽取统一的计算函数（如 `ExpiryRuleEngine` 或独立工具类）供两处复用。
 
 > 其余为轻微问题（命名、重复代码、未使用依赖等），不影响稳定运行，见第 8.6 节技术债清单。
@@ -383,7 +396,9 @@ Room Database (AppDatabase, v3, Hilt 单例)
 
 ---
 
-## 附：本次修改文件清单（性能优化补丁）
+## 附：本次修改文件清单（性能优化 + 加载/区分已完成/防误触补丁）
+
+第一轮（性能修复，commit `885e97b`）：
 
 | 文件 | 修改内容 |
 |------|------|
@@ -397,4 +412,14 @@ Room Database (AppDatabase, v3, Hilt 单例)
 | `MainActivity.kt` | 启动通知检查移 IO 线程 |
 | `util/DateUtils.kt` | 缓存 ZoneId |
 | `ui/product/ProductDetailScreen.kt` / `AddProductScreen.kt` / `EditProductScreen.kt` | AsyncImage 限尺寸 |
-| `.github/workflows/build-apk.yml` | 新增 GitHub Actions 自动构建 |
+| `.github/workflows/build-apk.yml` | 新增 GitHub Actions 自动构建 + Release 发布 |
+
+第二轮（本次交接，commit 待推送）：
+
+| 文件 | 修改内容 |
+|------|------|
+| `data/db/entity/ProductEntity.kt` | 新增 `completedAt` 字段（完成时间） |
+| `data/db/AppDatabase.kt` | 数据库 v3→v4 显式 Migration 新增 completedAt 列 |
+| `data/db/dao/ProductDao.kt` | `updateCompletionStatus` 标记完成时记录/清空 completedAt |
+| `ui/home/HomeViewModel.kt` | 已完成拆分「今日已完成」与「之前已完成」 |
+| `ui/home/HomeScreen.kt` | 加载指示器；已完成分组展示；滑动阈值 65%；Snackbar 撤销；滑动背景提示 |

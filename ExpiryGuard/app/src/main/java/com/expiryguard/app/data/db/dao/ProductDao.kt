@@ -149,7 +149,13 @@ suspend fun permanentDeleteAllActive()
 
     /**
      * 更新单个产品的完成状态
+     * 标记完成时记录完成时间，取消完成时清空完成时间
      */
-    @Query("UPDATE products SET isCompleted = :isCompleted, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun updateCompletionStatus(id: Long, isCompleted: Boolean, updatedAt: Long = System.currentTimeMillis())
+    @Query("UPDATE products SET isCompleted = :isCompleted, completedAt = :completedAt, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateCompletionStatus(
+        id: Long,
+        isCompleted: Boolean,
+        completedAt: Long? = if (isCompleted) System.currentTimeMillis() else null,
+        updatedAt: Long = System.currentTimeMillis()
+    )
 }

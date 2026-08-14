@@ -20,5 +20,6 @@ data class ProductEntity(
     val createdAt: Long = System.currentTimeMillis(),   // 创建时间
     val updatedAt: Long = System.currentTimeMillis(),   // 更新时间
     val deletedAt: Long? = null,                        // 删除时间（软删除标记）
-    val isCompleted: Boolean = false                    // 是否已完成
+    val isCompleted: Boolean = false,                   // 是否已完成
+    val completedAt: Long? = null                       // 完成时间（isCompleted 为 true 时记录）
 )

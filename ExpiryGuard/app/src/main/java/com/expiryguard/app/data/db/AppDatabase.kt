@@ -16,16 +16,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Room 数据库，version=3，包含产品和分类、保质期分组三张表
+ * Room 数据库，version=4，包含产品和分类、保质期分组三张表
  *
  * 版本历史：
  * v1 - 初始版本
  * v2 - 新增 isCompleted 字段（ProductEntity）
  * v3 - 新增 shelf_life_groups 表（ShelfLifeGroupEntity）
+ * v4 - 新增 completedAt 字段（ProductEntity），用于区分今日/历史已完成
  */
 @Database(
     entities = [ProductEntity::class, CategoryEntity::class, ShelfLifeGroupEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +37,15 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         private const val DATABASE_NAME = "expiry_guard.db"
+
+        /**
+         * v3 -> v4 迁移：products 表新增 completedAt 列，记录完成时间
+         */
+        private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE products ADD COLUMN completedAt INTEGER")
+            }
+        }
 
         /**
          * 单例实例，防止同时创建多个数据库实例
@@ -64,6 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
+                .addMigrations(MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {

@@ -22,17 +22,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -44,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +84,7 @@ import com.expiryguard.app.ui.theme.Yellow500
 import com.expiryguard.app.util.DateUtils
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 /**
  * 获取产品状态对应的颜色
@@ -115,6 +124,10 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 
+    // Snackbar 用于标记完成/取消完成后提示，并提供"撤销"避免误触误标
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     // 底部弹出层状态
     var selectedProduct by remember { mutableStateOf<ProductEntity?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -126,65 +139,93 @@ fun HomeScreen(
         }
     }
 
-    PullToRefreshBox(
-        isRefreshing = viewModel.isRefreshing.collectAsState().value,
-        onRefresh = { viewModel.refresh() },
-        modifier = Modifier.fillMaxSize()
-    ) {
-        if (uiState.totalCount == 0 && !uiState.isLoading) {
-            GradientBackground {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    EmptyState(
-                        message = "还没有清单，点击下方按钮添加第一个清单",
-                        icon = Icons.Outlined.AddCircleOutline,
-                        actionText = "添加清单",
-                        onAction = onNavigateToAddProduct
-                    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = viewModel.isRefreshing.collectAsState().value,
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (uiState.isLoading && uiState.totalCount == 0) {
+                // 首次加载：显示加载指示器，避免白屏/空状态闪烁
+                GradientBackground {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Green500)
+                    }
                 }
-            }
-        } else {
-            GradientBackground {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // 顶部：日期 + 问候语
-                    item { GreetingSection() }
+            } else if (uiState.totalCount == 0 && !uiState.isLoading) {
+                GradientBackground {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptyState(
+                            message = "还没有清单，点击下方按钮添加第一个清单",
+                            icon = Icons.Outlined.AddCircleOutline,
+                            actionText = "添加清单",
+                            onAction = onNavigateToAddProduct
+                        )
+                    }
+                }
+            } else {
+                GradientBackground {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // 顶部：日期 + 问候语
+                        item { GreetingSection() }
 
-                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                        item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                    // 搜索栏
-                    item {
-                        SearchBar(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onSearch = {
-                                onNavigateToProductList(searchQuery, "ALL")
+                        // 搜索栏
+                        item {
+                            SearchBar(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = {
+                                    onNavigateToProductList(searchQuery, "ALL")
+                                }
+                            )
+                        }
+
+                        item { Spacer(modifier = Modifier.height(12.dp)) }
+
+                        // 今日待办任务列表 —— 今天到期 + 还剩1天的预警清单
+                        todayTasksSection(
+                            todayExpiry = uiState.todayExpiry,
+                            warning = uiState.warning,
+                            todayCompleted = uiState.todayCompleted,
+                            previousCompleted = uiState.previousCompleted,
+                            onTaskCompleted = { product, isCompleted ->
+                                viewModel.toggleProductCompletion(product.id, isCompleted)
+                                showCompletionSnackbar(
+                                    scope = scope,
+                                    snackbarHostState = snackbarHostState,
+                                    product = product,
+                                    isCompleted = isCompleted,
+                                    onUndo = {
+                                        viewModel.toggleProductCompletion(product.id, false)
+                                    }
+                                )
+                            },
+                            onTaskClick = { product ->
+                                selectedProduct = product
                             }
                         )
                     }
-
-                    item { Spacer(modifier = Modifier.height(12.dp)) }
-
-                    // 今日待办任务列表 —— 今天到期 + 还剩1天的预警清单
-                    todayTasksSection(
-                        todayExpiry = uiState.todayExpiry,
-                        warning = uiState.warning,
-                        completedProducts = uiState.completedProducts,
-                        onTaskCompleted = { productId, isCompleted ->
-                            viewModel.toggleProductCompletion(productId, isCompleted)
-                        },
-                        onTaskClick = { product ->
-                            selectedProduct = product
-                        }
-                    )
                 }
             }
         }
+
+        // Snackbar 提示层，覆盖在界面顶部，不干扰列表布局
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // 底部弹出层：清单详情
@@ -202,6 +243,15 @@ fun HomeScreen(
                         selectedProduct!!.id,
                         !selectedProduct!!.isCompleted
                     )
+                    showCompletionSnackbar(
+                        scope = scope,
+                        snackbarHostState = snackbarHostState,
+                        product = selectedProduct!!,
+                        isCompleted = !selectedProduct!!.isCompleted,
+                        onUndo = {
+                            viewModel.toggleProductCompletion(selectedProduct!!.id, false)
+                        }
+                    )
                     selectedProduct = null
                 },
                 onNavigateToDetail = {
@@ -210,6 +260,33 @@ fun HomeScreen(
                 },
                 onDismiss = { selectedProduct = null }
             )
+        }
+    }
+}
+
+/**
+ * 展示标记完成/取消完成的提示，并提供撤销入口，防止误触
+ */
+private fun showCompletionSnackbar(
+    scope: kotlinx.coroutines.CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+    product: ProductEntity,
+    isCompleted: Boolean,
+    onUndo: () -> Unit
+) {
+    scope.launch {
+        val message = if (isCompleted) {
+            "已标记「${product.name}」完成"
+        } else {
+            "已取消「${product.name}」的完成标记"
+        }
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = if (isCompleted) "撤销" else null,
+            duration = SnackbarDuration.Short
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            onUndo()
         }
     }
 }
@@ -352,14 +429,16 @@ private fun SearchBar(
  * 今日待办区域 —— 显示今天到期 + 还剩1天的预警清单
  *
  * 支持左右滑动切换完成状态（左右方向均可标记/取消标记）。
+ * 已处理区域按完成时间拆分为「今日已完成」与「之前已完成」两组。
  * 作为 LazyListScope 扩展函数在 LazyColumn 中懒加载，避免一次性渲染全部卡片。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 private fun LazyListScope.todayTasksSection(
     todayExpiry: List<ProductEntity>,
     warning: List<ProductEntity>,
-    completedProducts: List<ProductEntity>,
-    onTaskCompleted: (Long, Boolean) -> Unit,
+    todayCompleted: List<ProductEntity>,
+    previousCompleted: List<ProductEntity>,
+    onTaskCompleted: (ProductEntity, Boolean) -> Unit,
     onTaskClick: (ProductEntity) -> Unit
 ) {
     // 合并今日到期 + 预警（还剩1天），按到期日期排序
@@ -398,7 +477,7 @@ private fun LazyListScope.todayTasksSection(
         }
     }
 
-    if (todayTasks.isEmpty() && completedProducts.isEmpty()) {
+    if (todayTasks.isEmpty() && todayCompleted.isEmpty() && previousCompleted.isEmpty()) {
         // 空状态
         item(key = "today_empty") {
             GlassCard(
@@ -424,15 +503,15 @@ private fun LazyListScope.todayTasksSection(
                 product = product,
                 isCompleted = false,
                 onSwipeComplete = {
-                    onTaskCompleted(product.id, true)
+                    onTaskCompleted(product, true)
                 },
                 onClick = { onTaskClick(product) }
             )
         }
 
-        // 已处理（今天处理过的记录）
-        if (completedProducts.isNotEmpty()) {
-            item(key = "completed_header") {
+        // 今日已完成（今天处理过的记录）
+        if (todayCompleted.isNotEmpty()) {
+            item(key = "today_completed_header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -440,22 +519,66 @@ private fun LazyListScope.todayTasksSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "已处理",
+                        text = "今日已完成",
                         style = MaterialTheme.typography.titleSmall,
                         color = Green500,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "${todayCompleted.size} 项",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Green500.copy(alpha = 0.7f)
                     )
                 }
             }
             items(
-                items = completedProducts.sortedByDescending { it.expiryDate },
+                items = todayCompleted.sortedByDescending { it.completedAt ?: 0L },
                 key = { it.id }
             ) { product ->
                 TaskCard(
                     product = product,
                     isCompleted = true,
                     onSwipeComplete = {
-                        onTaskCompleted(product.id, false)
+                        onTaskCompleted(product, false)
+                    },
+                    onClick = { onTaskClick(product) }
+                )
+            }
+        }
+
+        // 之前已完成（历史处理过的记录，折叠展示避免占据首页过多空间）
+        if (previousCompleted.isNotEmpty()) {
+            item(key = "previous_completed_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "之前已完成",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Gray500,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "${previousCompleted.size} 项",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Gray500.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            items(
+                items = previousCompleted.sortedByDescending { it.completedAt ?: 0L }.take(20),
+                key = { it.id }
+            ) { product ->
+                TaskCard(
+                    product = product,
+                    isCompleted = true,
+                    onSwipeComplete = {
+                        onTaskCompleted(product, false)
                     },
                     onClick = { onTaskClick(product) }
                 )
@@ -479,13 +602,16 @@ private fun TaskCard(
     // 已处理时用绿色压过原始状态色
     val statusColor = if (isCompleted) Green500 else statusToColor(productStatus)
 
+    // 滑动阈值：需滑动超过卡片宽度的 65% 才触发，避免轻滑误触
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            // 不管左滑还是右滑，都触发标记完成/取消完成
-            // 返回 false 防止卡片完全滑出（只触发动作，卡片回弹原位）
-            onSwipeComplete()
+            if (value == SwipeToDismissBoxValue.StartToEnd || value == SwipeToDismissBoxValue.EndToStart) {
+                // 返回 false 防止卡片完全滑出（只触发动作，卡片回弹原位）
+                onSwipeComplete()
+            }
             false
-        }
+        },
+        positionalThreshold = { totalDistance -> totalDistance * 0.65f }
     )
 
     SwipeToDismissBox(
@@ -493,20 +619,38 @@ private fun TaskCard(
         enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
         backgroundContent = {
+            val backgroundBrush = if (isCompleted) {
+                Brush.linearGradient(listOf(Gray500.copy(alpha = 0.5f), Gray500.copy(alpha = 0.3f)))
+            } else {
+                Brush.linearGradient(listOf(Green500.copy(alpha = 0.5f), Green500.copy(alpha = 0.3f)))
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Green500.copy(alpha = 0.15f))
+                    .background(backgroundBrush)
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = if (isCompleted) "取消完成" else "标记完成",
-                    tint = Green500,
-                    modifier = Modifier.size(36.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (isCompleted) Arrangement.End else Arrangement.Start
+                ) {
+                    Icon(
+                        imageVector = if (isCompleted) Icons.Default.Close else Icons.Default.CheckCircle,
+                        contentDescription = if (isCompleted) "取消完成" else "标记完成",
+                        tint = if (isCompleted) Gray500 else Green500,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isCompleted) "滑动取消完成" else "滑动标记完成",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isCompleted) Gray500 else Green500,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         },
         content = {
