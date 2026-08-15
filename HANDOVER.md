@@ -1,10 +1,9 @@
 # 过期管家 (ExpiryGuard) 项目交接文档
 
 > 最后更新：2026-08-14
-> 版本：1.0.1 (versionCode=2)
+> 版本：1.0.2 (versionCode=3)
 > 源码仓库：`https://github.com/Forinxy/get-end-data`（私有仓库）
-> 基础 commit：`641aa64`（本次交接含未推送的性能优化补丁，推送后 commit 会更新）
-> 交接包产出：HANDOVER.md / ExpiryGuard_源码.zip / ExpiryGuard_1.0.1_debug.apk
+> 交接包产出：HANDOVER.md / ExpiryGuard_1.0.2_source.zip / ExpiryGuard_1.0.2.apk
 
 ---
 
@@ -181,6 +180,16 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 | 滑动操作可撤销 | 标记/取消完成后弹出 Snackbar 提示具体清单名，并带「撤销」按钮，误触可一键恢复 |
 | 滑动背景提示 | 未完成时背景显示绿色「滑动标记完成」，已完成时显示灰色「滑动取消完成」，操作意图清晰 |
 
+第三轮（2026-08-14，本次交接，v1.0.2 日期输入/大图/统计优化）：
+
+| 优化项 | 说明 |
+|------|------|
+| 日期多格式文本输入 | 新增 `DateInputField` 组件（`ui/components/DateInputField.kt`），支持直接输入 `2019.1.1` / `2019年1月1日` / `2019 1 1` / `19.1.1` 等格式即时识别回写，附带日历选择兜底；替代原「点击弹日历」单一交互 |
+| 日期解析工具 | `DateUtils.parseDate` / `parseDateToTimestamp` 新增多格式解析，两位年份自动补 `20xx`，仅年月按当月 1 号处理 |
+| 生产/到期日期防点错 | 添加与编辑页日期字段改用 `DateInputField`，到期日红色（Red500）、生产日蓝色（Blue500）色点标签区分，输入即校验 |
+| 首页详情大图 | 首页底部详情弹层图片点击全屏放大查看（`FullScreenImageViewer`，黑底 + 点任意处/右上角关闭） |
+| 统计页计算优化 | `StatsViewModel` 状态统计由每项 4 次 `calculateStatus` 改为单次遍历累加，减少无谓计算 |
+
 ### 6.3 进行中 / 已搁置
 
 | 功能 | 状态 | 说明 |
@@ -193,7 +202,7 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 
 ### 6.4 最近可运行 commit
 
-`641aa64`（根目录工程，含性能优化补丁后可直接构建）。注意：仓库根目录存在 `ExpiryGuard/` 子目录，为较早版本的整体备份（ProductCard 视觉不同），主工程以根目录为准。
+当前推送后的最新 commit（v1.0.2，含日期输入/大图/统计优化）。注意：仓库根目录存在 `ExpiryGuard/` 子目录，为较早版本的整体备份（ProductCard 视觉不同），主工程以根目录为准。
 
 ---
 

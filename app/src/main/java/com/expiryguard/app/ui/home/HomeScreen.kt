@@ -2,6 +2,7 @@ package com.expiryguard.app.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -799,6 +802,8 @@ private fun ProductDetailSheet(
     val today = remember { DateUtils.todayTimestamp() }
     val daysLeft = remember { DateUtils.daysBetween(today, product.expiryDate) }
 
+    var showFullImage by remember { mutableStateOf(false) }
+
     val daysText = when {
         daysLeft < 0 -> "已过期 ${-daysLeft}天"
         daysLeft == 0 -> "今天到期"
@@ -841,11 +846,21 @@ private fun ProductDetailSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-                    .clip(RoundedCornerShape(16.dp)),
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { showFullImage = true },
                 contentScale = ContentScale.Crop
             )
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // 全屏查看大图
+        if (showFullImage && product.photoPath != null) {
+            FullScreenImageViewer(
+                photoPath = product.photoPath,
+                name = product.name,
+                onDismiss = { showFullImage = false }
+            )
         }
 
         // 清单名称 + 状态标签
@@ -1043,5 +1058,53 @@ private fun StatusBadgeCompleted() {
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
+    }
+}
+
+/**
+ * 全屏大图查看器 — 点击任意位置或图片关闭
+ */
+@Composable
+private fun FullScreenImageViewer(
+    photoPath: String,
+    name: String,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.95f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoPath)
+                    .size(1080)
+                    .build(),
+                contentDescription = name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onDismiss),
+                contentScale = ContentScale.Fit
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "关闭",
+                    tint = Color.White
+                )
+            }
+        }
     }
 }

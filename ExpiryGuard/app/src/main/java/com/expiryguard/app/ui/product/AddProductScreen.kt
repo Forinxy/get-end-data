@@ -31,7 +31,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -73,15 +72,15 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.expiryguard.app.ui.components.DatePickerDialog
+import com.expiryguard.app.ui.components.DateInputField
 import com.expiryguard.app.ui.components.GlassCard
 import com.expiryguard.app.ui.components.GradientBackground
 import com.expiryguard.app.ui.theme.Blue500
 import com.expiryguard.app.ui.theme.Gray500
 import com.expiryguard.app.ui.theme.Green500
+import com.expiryguard.app.ui.theme.Red500
 import com.expiryguard.app.util.DateUtils
 import java.io.File
-import java.time.LocalDate
 
 /**
  * 添加清单页面
@@ -155,10 +154,6 @@ fun AddProductScreen(
         }
     }
 
-    // 日期选择器状态
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showProductionDatePicker by remember { mutableStateOf(false) }
-
     // 自定义天数输入
     var customDaysText by remember { mutableStateOf("") }
 
@@ -226,69 +221,13 @@ fun AddProductScreen(
                     isCompleted = uiState.expiryDate != null
                 )
 
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { showDatePicker = true },
-                    selected = uiState.expiryDate != null
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = if (uiState.expiryDate != null)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                Gray500,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (uiState.expiryDate != null) {
-                                    "到期日期：${DateUtils.formatDate(uiState.expiryDate!!)}"
-                                } else {
-                                    "点击选择到期日期"
-                                },
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (uiState.expiryDate != null) FontWeight.Medium else FontWeight.Normal,
-                                color = if (uiState.expiryDate != null)
-                                    MaterialTheme.colorScheme.onSurface
-                                else
-                                    Gray500
-                            )
-                            if (uiState.shelfLifeGroup != null) {
-                                Text(
-                                    text = uiState.shelfLifeGroup!!.name,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                        TextButton(onClick = { showDatePicker = true }) {
-                            Text(if (uiState.expiryDate != null) "修改" else "选择")
-                        }
-                    }
-                }
-
-                // 日期选择器
-                if (showDatePicker) {
-                    DatePickerDialog(
-                        initialDate = if (uiState.expiryDate != null)
-                            DateUtils.toLocalDate(uiState.expiryDate!!)
-                        else
-                            LocalDate.now(),
-                        onDateSelected = { date ->
-                            viewModel.updateExpiryDate(date)
-                            showDatePicker = false
-                        },
-                        onDismiss = { showDatePicker = false }
-                    )
-                }
+                DateInputField(
+                    label = "到期日期",
+                    hint = "如 2019.1.1 或 2019年1月1日",
+                    value = uiState.expiryDate,
+                    accentColor = Red500,
+                    onDateSelected = { date -> viewModel.updateExpiryDate(date) }
+                )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -307,62 +246,13 @@ fun AddProductScreen(
                 )
 
                 // 生产日期选择
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { showProductionDatePicker = true },
-                    selected = uiState.productionDate != null
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = null,
-                            tint = if (uiState.productionDate != null)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                Gray500,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (uiState.productionDate != null) {
-                                    "生产日期：${DateUtils.formatDate(uiState.productionDate!!)}"
-                                } else {
-                                    "点击选择生产日期"
-                                },
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (uiState.productionDate != null) FontWeight.Medium else FontWeight.Normal,
-                                color = if (uiState.productionDate != null)
-                                    MaterialTheme.colorScheme.onSurface
-                                else
-                                    Gray500
-                            )
-                        }
-                        TextButton(onClick = { showProductionDatePicker = true }) {
-                            Text(if (uiState.productionDate != null) "修改" else "选择")
-                        }
-                    }
-                }
-
-                // 生产日期选择器
-                if (showProductionDatePicker) {
-                    DatePickerDialog(
-                        initialDate = if (uiState.productionDate != null)
-                            DateUtils.toLocalDate(uiState.productionDate!!)
-                        else
-                            LocalDate.now(),
-                        onDateSelected = { date ->
-                            viewModel.updateProductionDate(date)
-                            showProductionDatePicker = false
-                        },
-                        onDismiss = { showProductionDatePicker = false }
-                    )
-                }
+                DateInputField(
+                    label = "生产日期",
+                    hint = "如 2019.1.1 或 2019年1月1日",
+                    value = uiState.productionDate,
+                    accentColor = Blue500,
+                    onDateSelected = { date -> viewModel.updateProductionDate(date) }
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 

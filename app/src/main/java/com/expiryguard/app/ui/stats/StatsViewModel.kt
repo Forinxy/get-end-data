@@ -44,32 +44,22 @@ class StatsViewModel @Inject constructor(
             repository.getAllActiveProducts().collect { allProducts ->
                 // 排除已完成的清单
                 val products = allProducts.filter { !it.isCompleted }
-                val today = System.currentTimeMillis()
-                val safe = products.filter { product ->
-                    val status = com.expiryguard.app.domain.engine.ExpiryRuleEngine.calculateStatus(
+                var safe = 0
+                var expiring = 0
+                var returnable = 0
+                var expired = 0
+                products.forEach { product ->
+                    when (com.expiryguard.app.domain.engine.ExpiryRuleEngine.calculateStatus(
                         product.shelfLifeDays, product.expiryDate
-                    )
-                    status is com.expiryguard.app.domain.model.ProductStatus.Safe
-                }.size
-                val expiring = products.filter { product ->
-                    val status = com.expiryguard.app.domain.engine.ExpiryRuleEngine.calculateStatus(
-                        product.shelfLifeDays, product.expiryDate
-                    )
-                    status is com.expiryguard.app.domain.model.ProductStatus.ExpiringSoon ||
-                    status is com.expiryguard.app.domain.model.ProductStatus.Urgent
-                }.size
-                val returnable = products.filter { product ->
-                    val status = com.expiryguard.app.domain.engine.ExpiryRuleEngine.calculateStatus(
-                        product.shelfLifeDays, product.expiryDate
-                    )
-                    status is com.expiryguard.app.domain.model.ProductStatus.Returnable
-                }.size
-                val expired = products.filter { product ->
-                    val status = com.expiryguard.app.domain.engine.ExpiryRuleEngine.calculateStatus(
-                        product.shelfLifeDays, product.expiryDate
-                    )
-                    status is com.expiryguard.app.domain.model.ProductStatus.Expired
-                }.size
+                    )) {
+                        is com.expiryguard.app.domain.model.ProductStatus.Safe -> safe++
+                        is com.expiryguard.app.domain.model.ProductStatus.ExpiringSoon,
+                        is com.expiryguard.app.domain.model.ProductStatus.Urgent -> expiring++
+                        is com.expiryguard.app.domain.model.ProductStatus.Returnable -> returnable++
+                        is com.expiryguard.app.domain.model.ProductStatus.Expired -> expired++
+                        else -> {}
+                    }
+                }
 
                 _uiState.value = StatsUiState(
                     totalCount = products.size,
