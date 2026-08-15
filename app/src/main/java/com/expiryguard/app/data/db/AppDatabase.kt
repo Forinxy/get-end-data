@@ -1,6 +1,7 @@
 package com.expiryguard.app.data.db
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -14,6 +15,7 @@ import com.expiryguard.app.data.db.entity.ShelfLifeGroupEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Room 数据库，version=4，包含产品和分类、保质期分组三张表
@@ -69,6 +71,9 @@ abstract class AppDatabase : RoomDatabase() {
          * 构建数据库
          */
         private fun buildDatabase(context: Context): AppDatabase {
+            // 破坏性迁移兜底前先自动备份旧数据库，避免升级丢数据
+            backupLegacyDatabase(context)
+
             return Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
@@ -88,6 +93,84 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                 })
                 .build()
+        }
+
+        /**
+         * 备份旧版本数据库文件。
+         *
+         * 仓库历史从 v3 开始，v1/v2 无迁移链可还原；若用户从未发布版本升级而来，
+         * `fallbackToDestructiveMigration` 会清空数据。此处先将旧库文件复制到应用文件目录，
+         * 并导出到公共 Download 目录，供用户手动找回数据。
+         */
+        private fun backupLegacyDatabase(context: Context) {
+            try {
+                val dbFile = context.getDatabasePath(DATABASE_NAME)
+                if (!dbFile.exists()) return
+
+                // 读取现有数据库版本，仅当版本 < 3（无迁移链可覆盖）时才需要备份
+                val currentVersion = SQLiteDatabase.openDatabase(
+                    dbFile.path, null, SQLiteDatabase.OPEN_READONLY
+                ).use { db ->
+                    db.version
+                }
+                if (currentVersion >= 3) return
+
+                val backupDir = File(context.filesDir, "legacy_db_backup")
+                if (!backupDir.exists()) backupDir.mkdirs()
+                val backupFile = File(
+                    backupDir,
+                    "expiry_guard_v${currentVersion}_${System.currentTimeMillis()}.db"
+                )
+                dbFile.copyTo(backupFile, overwrite = true)
+
+                // 同时导出到公共 Download 目录，方便用户通过文件管理器取回
+                exportToDownloads(context, backupFile)
+            } catch (_: Exception) {
+                // 备份失败不阻塞数据库初始化
+            }
+        }
+
+        /**
+         * 将备份文件通过 MediaStore 导出到公共 Download 目录（Android 8.0+ 无需存储权限）
+         */
+        private fun exportToDownloads(context: Context, sourceFile: File) {
+            try {
+                val fileName = sourceFile.name
+                val contentValues = android.content.ContentValues().apply {
+                    put(
+                        android.provider.MediaStore.Downloads.DISPLAY_NAME,
+                        fileName
+                    )
+                    put(
+                        android.provider.MediaStore.Downloads.MIME_TYPE,
+                        "application/octet-stream"
+                    )
+                    put(
+                        android.provider.MediaStore.Downloads.RELATIVE_PATH,
+                        android.os.Environment.DIRECTORY_DOWNLOADS + "/ExpiryGuard"
+                    )
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                }
+
+                val resolver = context.contentResolver
+                val uri = resolver.insert(
+                    android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    contentValues
+                )
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { output ->
+                        sourceFile.inputStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                    val updateValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                    }
+                    resolver.update(uri, updateValues, null, null)
+                }
+            } catch (_: Exception) {
+                // 导出失败不影响本地备份
+            }
         }
 
         /**

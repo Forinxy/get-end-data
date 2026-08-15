@@ -190,6 +190,7 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 | 首页详情大图 | 首页底部详情弹层图片点击全屏放大查看（`FullScreenImageViewer`，黑底 + 点任意处/右上角关闭） |
 | 统计页计算优化 | `StatsViewModel` 状态统计由每项 4 次 `calculateStatus` 改为单次遍历累加，减少无谓计算 |
 | 通知与首页口径统一 | 抽取 `ExpiryRuleEngine.computePendingGroups()` 统一分组计算，`MainActivity` 启动通知与 `HomeViewModel` 首页复用同一口径（含已过期项），数量不再不一致 |
+| 旧库破坏前自动备份 | 数据库构建时检测版本 <3 的旧库（无迁移链），自动复制到应用目录并导出 `Download/ExpiryGuard/`，destructive 兜底触发前数据可找回 |
 
 ### 6.3 进行中 / 已搁置
 
@@ -302,7 +303,7 @@ Room Database (AppDatabase, v4, Hilt 单例)
 3. **WorkManager 未使用**：依赖已引入但无 Worker 实现，定时通知未完成。
 4. **产品名称固定"清单"**：`AddProductViewModel.saveProduct()` 中 `name = "清单"`，用户无法自定义名称。
 5. **`ExpiringSoon` 状态未被引擎返回**：密封类定义了但引擎从未产出。
-6. **数据库迁移策略部分解决**：v3→v4 已提供显式 Migration（新增 `completedAt` 列），但仍保留 `fallbackToDestructiveMigration` 作为老版本兜底；未来每次升级都应补充显式 Migration。
+6. **数据库迁移策略部分解决**：v3→v4 已提供显式 Migration（新增 `completedAt` 列）；v1/v2 无历史 schema 可补迁移链，但已在 `buildDatabase` 增加旧库自动备份（版本 <3 时复制到应用目录并导出 Download/ExpiryGuard/），destructive 兜底触发前数据可找回。未来每次升级都应补充显式 Migration。
 7. **仓库存在重复工程**：根目录为主工程，`ExpiryGuard/` 为旧版备份目录，建议清理以避免混淆。
 
 ---
