@@ -1,7 +1,28 @@
 package com.expiryguard.app.domain.engine
 
+import com.expiryguard.app.data.db.entity.ProductEntity
 import com.expiryguard.app.domain.model.ProductStatus
 import com.expiryguard.app.util.DateUtils
+
+/**
+ * 待办清单分组结果，供首页与启动通知统一使用同一口径
+ *
+ * @property todayExpiry 今日到期清单
+ * @property returnable 可退货清单
+ * @property expired 已过期清单
+ * @property warning 预警清单（还剩1天，且不在上述三组中）
+ */
+data class PendingGroups(
+    val todayExpiry: List<ProductEntity>,
+    val returnable: List<ProductEntity>,
+    val expired: List<ProductEntity>,
+    val warning: List<ProductEntity>
+) {
+    /** 今日待办总数量（今日到期 + 可退货 + 已过期 + 预警，已去重） */
+    val totalCount: Int
+        get() = (todayExpiry.map { it.id } + returnable.map { it.id } +
+                expired.map { it.id } + warning.map { it.id }).toSet().size
+}
 
 /**
  * 到期规则引擎，根据产品保质期和到期日期计算状态
@@ -81,5 +102,55 @@ object ExpiryRuleEngine {
             shelfLifeDays >= 90 -> 15    // 3 个月 ~ 6 个月（90~183）
             else -> 0                    // 低于 3 个月，不可退货
         }
+    }
+
+    /**
+     * 计算待办清单分组（今日到期 / 可退货 / 已过期 / 预警），
+     * 首页今日待办与启动通知使用同一口径，保证数量一致。
+     *
+     * 口径：
+     * - 今日到期：到期日期是今天
+     * - 可退货：状态为 Returnable
+     * - 已过期：到期日期已过
+     * - 预警：还剩1天到期，且不在上述三组中
+     *
+     * @param products 全部活跃清单
+     * @param today 今天零点时间戳
+     */
+    fun computePendingGroups(products: List<ProductEntity>, today: Long): PendingGroups {
+        // 今日到期：到期日期是今天
+        val todayExpiry = products.filter {
+            DateUtils.isToday(it.expiryDate) && !it.isCompleted
+        }
+
+        // 可退货清单：根据规则1，到期前阈值天时放入待办
+        val returnable = products.filter { product ->
+            val status = calculateStatus(product.shelfLifeDays, product.expiryDate)
+            status is ProductStatus.Returnable && !product.isCompleted
+        }
+
+        // 已过期：到期日期已过，需要立即处理
+        val expired = products.filter {
+            val days = DateUtils.daysBetween(today, it.expiryDate)
+            days < 0 && !it.isCompleted
+        }
+
+        // 今日到期（含可退货、已过期）—— 合并去重
+        val todayWithReturnableIds = (todayExpiry.map { it.id } +
+                returnable.map { it.id } +
+                expired.map { it.id }).toSet()
+
+        // 预警：还有1天到期（排除已在今日待办中的清单）
+        val warning = products.filter {
+            val days = DateUtils.daysBetween(today, it.expiryDate)
+            days == 1 && !it.isCompleted && it.id !in todayWithReturnableIds
+        }
+
+        return PendingGroups(
+            todayExpiry = todayExpiry,
+            returnable = returnable,
+            expired = expired,
+            warning = warning
+        )
     }
 }

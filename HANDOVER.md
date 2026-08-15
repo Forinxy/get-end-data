@@ -189,6 +189,7 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 | 生产/到期日期防点错 | 添加与编辑页日期字段改用 `DateInputField`，到期日红色（Red500）、生产日蓝色（Blue500）色点标签区分，输入即校验 |
 | 首页详情大图 | 首页底部详情弹层图片点击全屏放大查看（`FullScreenImageViewer`，黑底 + 点任意处/右上角关闭） |
 | 统计页计算优化 | `StatsViewModel` 状态统计由每项 4 次 `calculateStatus` 改为单次遍历累加，减少无谓计算 |
+| 通知与首页口径统一 | 抽取 `ExpiryRuleEngine.computePendingGroups()` 统一分组计算，`MainActivity` 启动通知与 `HomeViewModel` 首页复用同一口径（含已过期项），数量不再不一致 |
 
 ### 6.3 进行中 / 已搁置
 
@@ -300,10 +301,9 @@ Room Database (AppDatabase, v4, Hilt 单例)
 2. **ProGuard 规则不完整**：仅保留 Gson 注解，Release 混淆时 Room/Hilt/Coil 需补充规则（当前 `isMinifyEnabled=false`，无实际影响）。
 3. **WorkManager 未使用**：依赖已引入但无 Worker 实现，定时通知未完成。
 4. **产品名称固定"清单"**：`AddProductViewModel.saveProduct()` 中 `name = "清单"`，用户无法自定义名称。
-5. **`MainActivity` 通知逻辑与首页 `processProducts` 不完全一致**：前者未包含已过期项，后者包含（业务影响：启动通知数量口径略不同）。
-6. **`ExpiringSoon` 状态未被引擎返回**：密封类定义了但引擎从未产出。
-7. **数据库迁移策略部分解决**：v3→v4 已提供显式 Migration（新增 `completedAt` 列），但仍保留 `fallbackToDestructiveMigration` 作为老版本兜底；未来每次升级都应补充显式 Migration。
-8. **仓库存在重复工程**：根目录为主工程，`ExpiryGuard/` 为旧版备份目录，建议清理以避免混淆。
+5. **`ExpiringSoon` 状态未被引擎返回**：密封类定义了但引擎从未产出。
+6. **数据库迁移策略部分解决**：v3→v4 已提供显式 Migration（新增 `completedAt` 列），但仍保留 `fallbackToDestructiveMigration` 作为老版本兜底；未来每次升级都应补充显式 Migration。
+7. **仓库存在重复工程**：根目录为主工程，`ExpiryGuard/` 为旧版备份目录，建议清理以避免混淆。
 
 ---
 
@@ -318,7 +318,8 @@ Room Database (AppDatabase, v4, Hilt 单例)
 ### 9.2 严重问题（需优先处理）
 
 1. **`fallbackToDestructiveMigration()` 兜底**：数据库升级依赖显式 Migration；若未来未提供 Migration 会清空用户数据。修复方向：每次升级补充 `Migration` 对象，逐步移除兜底。
-2. **启动通知逻辑与首页待办口径不一致**：可能导致通知数量与首页展示不符。修复方向：抽取统一的计算函数（如 `ExpiryRuleEngine` 或独立工具类）供两处复用。
+
+> 已解决：~~启动通知逻辑与首页待办口径不一致~~——`ExpiryRuleEngine.computePendingGroups()` 已抽取统一口径，`MainActivity` 通知与 `HomeViewModel` 首页复用同一函数（含已过期项）。
 
 > 其余为轻微问题（命名、重复代码、未使用依赖等），不影响稳定运行，见第 8.6 节技术债清单。
 

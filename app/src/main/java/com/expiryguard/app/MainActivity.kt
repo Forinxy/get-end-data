@@ -15,7 +15,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.lifecycle.lifecycleScope
 import com.expiryguard.app.data.repository.ProductRepository
 import com.expiryguard.app.domain.engine.ExpiryRuleEngine
-import com.expiryguard.app.domain.model.ProductStatus
 import com.expiryguard.app.navigation.AppNavigation
 import com.expiryguard.app.notification.NotificationHelper
 import com.expiryguard.app.ui.theme.ExpiryGuardTheme
@@ -57,31 +56,13 @@ class MainActivity : ComponentActivity() {
                         val products = repository.getAllActiveProducts().first()
                         val today = DateUtils.todayTimestamp()
 
-                        // 待处理：今日到期 + 可退货 + 预警（还剩1天）
-                        val todayExpiry = products.filter {
-                            DateUtils.isToday(it.expiryDate) && !it.isCompleted
-                        }
-                        val returnable = products.filter { product ->
-                            val status = ExpiryRuleEngine.calculateStatus(
-                                product.shelfLifeDays, product.expiryDate
-                            )
-                            status is ProductStatus.Returnable && !product.isCompleted
-                        }
-                        val warning = products.filter {
-                            val days = DateUtils.daysBetween(today, it.expiryDate)
-                            days == 1 && !it.isCompleted
-                        }
+                        // 统一口径计算待办分组（与首页今日待办一致）
+                        val groups = ExpiryRuleEngine.computePendingGroups(products, today)
 
-                        // 合并去重
-                        val pendingIds = (todayExpiry.map { it.id } +
-                                returnable.map { it.id } +
-                                warning.map { it.id }).toSet()
-
-                        val pendingCount = pendingIds.size
-                        val returnableCount = returnable.size
-                        val expiredCount = products.count {
-                            DateUtils.daysBetween(today, it.expiryDate) <= 0 && !it.isCompleted
-                        }
+                        // 待处理总数量（今日到期 + 可退货 + 已过期 + 预警，已去重）
+                        val pendingCount = groups.totalCount
+                        val returnableCount = groups.returnable.size
+                        val expiredCount = groups.expired.size
 
                         if (pendingCount > 0) {
                             NotificationHelper.sendPendingNotification(
