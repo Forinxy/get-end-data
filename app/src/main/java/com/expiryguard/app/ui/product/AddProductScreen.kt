@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -181,9 +182,36 @@ fun AddProductScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
-                // ========== 第一步：拍照 ==========
+                // ========== 第一步：清单名称 ==========
                 SectionHeader(
                     step = "1",
+                    title = "清单名称",
+                    isCompleted = uiState.name.isNotBlank()
+                )
+
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = uiState.name,
+                        onValueChange = { viewModel.updateName(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        placeholder = { Text("输入清单名称，如「酸奶」「洗发水」") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ========== 第二步：拍照 ==========
+                SectionHeader(
+                    step = "2",
                     title = "拍照",
                     isCompleted = uiState.photoPath != null
                 )
@@ -216,7 +244,7 @@ fun AddProductScreen(
 
                 // ========== 第二步：选到期日期 ==========
                 SectionHeader(
-                    step = "2",
+                    step = "3",
                     title = "选择到期日",
                     isCompleted = uiState.expiryDate != null
                 )
@@ -233,7 +261,7 @@ fun AddProductScreen(
 
                 // ========== 第三步：到期计算（生产日期 + 保质期） ==========
                 SectionHeader(
-                    step = "3",
+                    step = "4",
                     title = "到期计算（可选）",
                     isCompleted = uiState.productionDate != null && uiState.expiryDate != null
                 )
@@ -365,7 +393,7 @@ fun AddProductScreen(
 
                 // ========== 第四步：选保质期分组 ==========
                 SectionHeader(
-                    step = "4",
+                    step = "5",
                     title = "选择保质期分组",
                     isCompleted = uiState.shelfLifeGroup != null
                 )

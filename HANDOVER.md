@@ -193,6 +193,7 @@ Gradle 发行版使用腾讯云镜像（`gradle/wrapper/gradle-wrapper.propertie
 | 通知与首页口径统一 | 抽取 `ExpiryRuleEngine.computePendingGroups()` 统一分组计算，`MainActivity` 启动通知与 `HomeViewModel` 首页复用同一口径（含已过期项），数量不再不一致 |
 | 旧库破坏前自动备份 | 数据库构建时检测版本 <3 的旧库（无迁移链），自动复制到应用目录并导出 `Download/ExpiryGuard/`，destructive 兜底触发前数据可找回 |
 | ExpiringSoon 状态启用 | 短保质期产品（<90 天，退货阈值=0）剩余 4~30 天返回「即将到期」，填补安全→紧急预警断层；列表「即将到期」筛选改为按状态匹配 |
+| 产品名称自定义 | 添加页新增第一步「清单名称」输入，保存校验非空，替代固定「清单」名称 |
 
 ### 6.3 进行中 / 已搁置
 
@@ -303,7 +304,7 @@ Room Database (AppDatabase, v4, Hilt 单例)
 1. **`.gitignore` 缺失于仓库根**：构建产物 `build/`、`.gradle/`、`local.properties` 可能被误提交（本机已建 `local.properties`，未提交）。
 2. **ProGuard 规则不完整**：仅保留 Gson 注解，Release 混淆时 Room/Hilt/Coil 需补充规则（当前 `isMinifyEnabled=false`，无实际影响）。
 3. **WorkManager 未使用**：依赖已引入但无 Worker 实现，定时通知未完成。
-4. **产品名称固定"清单"**：`AddProductViewModel.saveProduct()` 中 `name = "清单"`，用户无法自定义名称。
+4. **产品名称固定"清单"已解决**：`AddProductViewModel` 新增 `name` 状态与 `updateName`，添加页第一步输入清单名称，保存时校验非空。
 5. **仓库存在重复工程**：根目录为主工程，`ExpiryGuard/` 为旧版备份目录，建议清理以避免混淆。
 6. **数据库迁移策略部分解决**：v3→v4 已提供显式 Migration（新增 `completedAt` 列）；v1/v2 无历史 schema 可补迁移链，但已在 `buildDatabase` 增加旧库自动备份（版本 <3 时复制到应用目录并导出 Download/ExpiryGuard/），destructive 兜底触发前数据可找回。未来每次升级都应补充显式 Migration。
 

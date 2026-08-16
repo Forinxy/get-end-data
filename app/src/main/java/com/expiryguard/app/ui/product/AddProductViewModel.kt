@@ -116,6 +116,7 @@ data class ShelfLifeGroupUi(
  * 添加清单页面状态
  */
 data class AddProductUiState(
+    val name: String = "",
     val productionDate: Long? = null,
     val expiryDate: Long? = null,
     val shelfLifeGroup: ShelfLifeGroupUi? = null,
@@ -226,6 +227,13 @@ class AddProductViewModel @Inject constructor(
                 shelfLifeDays = estimateShelfLifeDays(group.minDays, group.maxDays)
             )
         }
+    }
+
+    /**
+     * 更新清单名称
+     */
+    fun updateName(name: String) {
+        _uiState.update { it.copy(name = name) }
     }
 
     /**
@@ -355,6 +363,11 @@ class AddProductViewModel @Inject constructor(
     fun saveProduct() {
         val state = _uiState.value
 
+        if (state.name.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "请输入清单名称") }
+            return
+        }
+
         if (state.expiryDate == null) {
             _uiState.update { it.copy(errorMessage = "请选择到期日期") }
             return
@@ -364,7 +377,7 @@ class AddProductViewModel @Inject constructor(
 
         viewModelScope.launch {
             val product = ProductEntity(
-                name = "清单",
+                name = state.name.trim(),
                 categoryId = state.categoryId,
                 photoPath = state.photoPath,
                 productionDate = state.productionDate,
