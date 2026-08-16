@@ -17,6 +17,7 @@ import com.expiryguard.app.data.repository.ProductRepository
 import com.expiryguard.app.domain.engine.ExpiryRuleEngine
 import com.expiryguard.app.navigation.AppNavigation
 import com.expiryguard.app.notification.NotificationHelper
+import com.expiryguard.app.notification.ReminderScheduler
 import com.expiryguard.app.ui.theme.ExpiryGuardTheme
 import com.expiryguard.app.util.DateUtils
 import dagger.hilt.android.AndroidEntryPoint
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // 注册每日定时到期提醒（幂等）
+        ReminderScheduler.scheduleDailyReminder(this)
 
         // 启动时检查待处理清单，发送通知
         // 查询与过滤在 IO 线程执行，避免阻塞首帧渲染
