@@ -1,9 +1,10 @@
 # 过期管家 (ExpiryGuard) 项目交接文档
 
-> 最后更新：2026-08-14
+> 最后更新：2026-08-16
 > 版本：1.0.2 (versionCode=3)
 > 源码仓库：`https://github.com/Forinxy/get-end-data`（私有仓库）
 > 交接包产出：HANDOVER.md / ExpiryGuard_1.0.2_source.zip / ExpiryGuard_1.0.2.apk
+> 交付状态：v1.0.2 已发布。提交 `468c8e2`（功能）、`d69759d`（口径统一）、`83cfa31`（防丢数据）、`48ee75b`（ExpiringSoon）、`20a8664`（文档）已推送 origin/main，Release v1.0.2 双资产已更新
 
 ---
 
