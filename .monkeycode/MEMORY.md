@@ -47,3 +47,12 @@ Entries discovered by the Agent during task execution should follow this format:
   - 卸载应用会删除本地 Room 数据库（expiry_guard.db），重新安装后数据必然丢失，需依赖应用内「备份与恢复」功能导出/导入数据
   - 该应用旧版本数据库版本为 v1/v2/v3，若从 v2/v1 直接升级到 v4 且无完整迁移链，会触发 fallbackToDestructiveMigration 清空数据
   - 排查数据丢失时先对比新旧 APK 签名（apksigner verify --print-certs）排除签名变更导致的卸载重装
+
+[Project Knowledge Summary]
+- Date: 2026-08-16
+- Context: Discovered by Agent while implementing v1.0.2 数据安全与状态引擎改进
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - 数据库无迁移链的极老版本（v1/v2）无法补 Migration（Room schema 校验失败会崩溃而非兜底），改用「破坏前自动备份」：buildDatabase 构建前检测版本<3 旧库，复制到应用目录并导出 Download/ExpiryGuard/，destructive 兜底触发前数据可找回
+  - ExpiringSoon 状态已启用：退货阈值=0 的短保质期产品（保质期<90天）在剩余 4~30 天返回该状态，填补安全→紧急预警断层；列表「即将到期」筛选按状态匹配而非 days in 1..3
+  - 首页待办与启动通知共用 ExpiryRuleEngine.computePendingGroups() 统一口径（今日到期+可退货+已过期+预警，已去重）
