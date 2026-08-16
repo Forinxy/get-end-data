@@ -32,6 +32,12 @@ data class PendingGroups(
 object ExpiryRuleEngine {
 
     /**
+     * 「即将到期」预警窗口天数：短保质期产品（退货阈值=0）在到期前这段天数内
+     * 标记为即将到期，填补「安全」到「紧急」之间的渐进预警
+     */
+    private const val EXPIRING_SOON_WINDOW_DAYS = 30
+
+    /**
      * 计算产品当前状态（使用硬编码默认阈值）
      *
      * @param shelfLifeDays 保质期天数（用于计算默认阈值）
@@ -77,6 +83,12 @@ object ExpiryRuleEngine {
                 remainingDays = remainingDays,
                 threshold = effectiveThreshold
             )
+        }
+
+        // 即将到期：短保质期产品（退货阈值=0，如保质期<3个月）无退货窗口，
+        // 用该状态填补「安全」到「紧急」之间的渐进预警（剩余 4~30 天）
+        if (effectiveThreshold == 0 && remainingDays <= EXPIRING_SOON_WINDOW_DAYS) {
+            return ProductStatus.ExpiringSoon(remainingDays = remainingDays)
         }
 
         // 安全状态

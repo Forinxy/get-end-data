@@ -110,8 +110,8 @@ class ProductListViewModel @Inject constructor(
                 status is ProductStatus.Safe
             }
             ProductFilter.EXPIRING_SOON -> products.filter {
-                val days = DateUtils.daysBetween(today, it.expiryDate)
-                days in 1..3
+                val status = ExpiryRuleEngine.calculateStatus(it.shelfLifeDays, it.expiryDate)
+                status is ProductStatus.ExpiringSoon
             }
             ProductFilter.RETURNABLE -> products.filter {
                 val status = ExpiryRuleEngine.calculateStatus(it.shelfLifeDays, it.expiryDate)
