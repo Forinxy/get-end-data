@@ -54,7 +54,7 @@ class StatsViewModel @Inject constructor(
                     )) {
                         is com.expiryguard.app.domain.model.ProductStatus.Safe -> safe++
                         is com.expiryguard.app.domain.model.ProductStatus.ExpiringSoon,
-                        is com.expiryguard.app.domain.model.ProductStatus.Urgent -> expiring++
+                        is com.expiryguard.app.domain.model.ProductStatus.TakeDown -> expiring++
                         is com.expiryguard.app.domain.model.ProductStatus.Returnable -> returnable++
                         is com.expiryguard.app.domain.model.ProductStatus.Expired -> expired++
                         else -> {}

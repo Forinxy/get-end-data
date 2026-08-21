@@ -234,7 +234,7 @@ fun EditProductScreen(
                     )
                     DateInputField(
                         label = "到期日期",
-                        hint = "如 2019.1.1 或 2019年1月1日",
+                        hint = "如 1.1 或 1月1日（年份默认今年）",
                         value = uiState.expiryDate,
                         accentColor = Red500,
                         onDateSelected = { date -> viewModel.updateExpiryDate(date) }

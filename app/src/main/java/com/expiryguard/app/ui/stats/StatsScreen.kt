@@ -65,7 +65,7 @@ private fun getStatusColor(status: ProductStatus): Color {
         is ProductStatus.Safe -> Green500
         is ProductStatus.ExpiringSoon -> Yellow500
         is ProductStatus.Returnable -> Blue500
-        is ProductStatus.Urgent -> Red500
+        is ProductStatus.TakeDown -> Red500
         is ProductStatus.Expired -> Red500
     }
 }
@@ -78,7 +78,7 @@ private fun getStatusLabel(status: ProductStatus): String {
         is ProductStatus.Safe -> "安全"
         is ProductStatus.ExpiringSoon -> "即将到期"
         is ProductStatus.Returnable -> "可退货"
-        is ProductStatus.Urgent -> "紧急"
+        is ProductStatus.TakeDown -> "可下架"
         is ProductStatus.Expired -> "已过期"
     }
 }

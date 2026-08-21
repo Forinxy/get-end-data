@@ -63,8 +63,9 @@ class MainActivity : ComponentActivity() {
                         // 统一口径计算待办分组（与首页今日待办一致）
                         val groups = ExpiryRuleEngine.computePendingGroups(products, today)
 
-                        // 待处理总数量（今日到期 + 可退货 + 已过期 + 预警，已去重）
+                        // 待处理总数量（今日到期 + 可下架 + 可退货 + 已过期 + 预警，已去重）
                         val pendingCount = groups.totalCount
+                        val takeDownCount = groups.takeDown.size
                         val returnableCount = groups.returnable.size
                         val expiredCount = groups.expired.size
 
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
                                 this@MainActivity,
                                 pendingCount,
                                 returnableCount,
+                                takeDownCount,
                                 expiredCount
                             )
                         }

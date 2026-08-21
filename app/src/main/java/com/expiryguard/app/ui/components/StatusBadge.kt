@@ -75,9 +75,9 @@ fun StatusBadge(status: ProductStatus) {
             )
         }
 
-        is ProductStatus.Urgent -> {
-            // 红色闪烁标签
-            val infiniteTransition = rememberInfiniteTransition(label = "urgent_blink")
+        is ProductStatus.TakeDown -> {
+            // 红色闪烁标签：可下架
+            val infiniteTransition = rememberInfiniteTransition(label = "take_down_blink")
             val alpha by infiniteTransition.animateFloat(
                 initialValue = 1f,
                 targetValue = 0.4f,
@@ -124,7 +124,7 @@ fun StatusBadge(status: ProductStatus) {
                 )
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "紧急 ${status.remainingDays}天",
+                    text = "可下架 ${status.remainingDays}天",
                     color = Red500.copy(alpha = alpha),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold

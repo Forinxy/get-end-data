@@ -337,7 +337,7 @@ private fun getTrashStatusColor(status: ProductStatus): Color {
         is ProductStatus.Safe -> Green500.copy(alpha = 0.6f)
         is ProductStatus.ExpiringSoon -> Yellow500.copy(alpha = 0.6f)
         is ProductStatus.Returnable -> Color(0xFF2563EB).copy(alpha = 0.6f)
-        is ProductStatus.Urgent -> Red500.copy(alpha = 0.6f)
+        is ProductStatus.TakeDown -> Red500.copy(alpha = 0.6f)
         is ProductStatus.Expired -> Gray500.copy(alpha = 0.6f)
     }
 }
@@ -350,7 +350,7 @@ private fun getTrashStatusLabel(status: ProductStatus): String {
         is ProductStatus.Safe -> "安全"
         is ProductStatus.ExpiringSoon -> "即将到期"
         is ProductStatus.Returnable -> "可退货"
-        is ProductStatus.Urgent -> "紧急"
+        is ProductStatus.TakeDown -> "可下架"
         is ProductStatus.Expired -> "已过期"
     }
 }

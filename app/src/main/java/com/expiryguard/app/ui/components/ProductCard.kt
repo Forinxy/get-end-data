@@ -47,7 +47,7 @@ private fun statusToColor(status: ProductStatus): Color {
         is ProductStatus.Safe -> Green500
         is ProductStatus.ExpiringSoon -> Yellow500
         is ProductStatus.Returnable -> Blue500
-        is ProductStatus.Urgent -> Red500
+        is ProductStatus.TakeDown -> Red500
         is ProductStatus.Expired -> Red700
     }
 }
@@ -192,10 +192,12 @@ fun ProductCard(
 }
 
 /**
- * 已处理状态标签 — 绿色"已处理"压过过期/紧急标记
+ * 已处理状态标签 — 绿色"已处理/已下架/已退货处理"压过过期/可下架标记
+ *
+ * @param label 处理方式文字（已处理 / 已下架 / 已退货处理）
  */
 @Composable
-fun StatusBadgeCompleted() {
+fun StatusBadgeCompleted(label: String = "已处理") {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -233,7 +235,7 @@ fun StatusBadgeCompleted() {
         )
         Spacer(modifier = Modifier.width(5.dp))
         Text(
-            text = "已处理",
+            text = label,
             color = Green500.copy(alpha = 0.95f),
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold

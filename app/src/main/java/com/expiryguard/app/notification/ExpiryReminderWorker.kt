@@ -52,6 +52,7 @@ class ExpiryReminderWorker @AssistedInject constructor(
                     applicationContext,
                     pendingCount,
                     groups.returnable.size,
+                    groups.takeDown.size,
                     groups.expired.size
                 )
             }

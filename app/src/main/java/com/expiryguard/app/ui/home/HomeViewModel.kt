@@ -97,20 +97,20 @@ class HomeViewModel @Inject constructor(
         // 统一口径分组（与启动通知一致）
         val groups = ExpiryRuleEngine.computePendingGroups(products, today)
 
-        // 今日到期（含可退货、已过期）—— 合并去重
-        val todayWithReturnable = (groups.todayExpiry + groups.returnable + groups.expired).distinctBy { it.id }
+        // 今日到期（含可下架、可退货、已过期）—— 合并去重
+        val todayWithReturnable = (groups.todayExpiry + groups.takeDown + groups.returnable + groups.expired).distinctBy { it.id }
 
         // 预警（还剩1天，已排除今日待办）
         val warning = groups.warning
 
-        // 已处理：仅保留今日到期、预警、已过期或可退货的已完成清单
+        // 已处理：仅保留今日到期、可下架、预警、已过期或可退货的已完成清单
         // 按完成时间拆分为「今日已完成」与「之前已完成」
         val completed = products.filter { product ->
             if (!product.isCompleted) return@filter false
             val days = DateUtils.daysBetween(today, product.expiryDate)
             if (days <= 1) return@filter true
             val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
-            status is ProductStatus.Returnable
+            status is ProductStatus.Returnable || status is ProductStatus.TakeDown
         }
         val (todayCompleted, previousCompleted) = completed.partition { product ->
             product.completedAt != null && DateUtils.isToday(product.completedAt!!)

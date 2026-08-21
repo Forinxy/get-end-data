@@ -182,11 +182,11 @@ fun AddProductScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
-                // ========== 第一步：清单名称 ==========
+                // ========== 第一步：清单名称（可选） ==========
                 SectionHeader(
                     step = "1",
                     title = "清单名称",
-                    isCompleted = uiState.name.isNotBlank()
+                    isCompleted = false
                 )
 
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -196,7 +196,7 @@ fun AddProductScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(8.dp),
-                        placeholder = { Text("输入清单名称，如「酸奶」「洗发水」") },
+                        placeholder = { Text("可选，如「酸奶」「洗发水」") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -251,7 +251,7 @@ fun AddProductScreen(
 
                 DateInputField(
                     label = "到期日期",
-                    hint = "如 2019.1.1 或 2019年1月1日",
+                    hint = "如 1.1 或 1月1日（年份默认今年）",
                     value = uiState.expiryDate,
                     accentColor = Red500,
                     onDateSelected = { date -> viewModel.updateExpiryDate(date) }
@@ -276,7 +276,7 @@ fun AddProductScreen(
                 // 生产日期选择
                 DateInputField(
                     label = "生产日期",
-                    hint = "如 2019.1.1 或 2019年1月1日",
+                    hint = "如 1.1 或 1月1日（年份默认今年）",
                     value = uiState.productionDate,
                     accentColor = Blue500,
                     onDateSelected = { date -> viewModel.updateProductionDate(date) }

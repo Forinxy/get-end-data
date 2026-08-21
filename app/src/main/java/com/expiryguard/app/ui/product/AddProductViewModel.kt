@@ -363,11 +363,6 @@ class AddProductViewModel @Inject constructor(
     fun saveProduct() {
         val state = _uiState.value
 
-        if (state.name.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "请输入清单名称") }
-            return
-        }
-
         if (state.expiryDate == null) {
             _uiState.update { it.copy(errorMessage = "请选择到期日期") }
             return
@@ -377,7 +372,7 @@ class AddProductViewModel @Inject constructor(
 
         viewModelScope.launch {
             val product = ProductEntity(
-                name = state.name.trim(),
+                name = state.name.trim().ifBlank { "清单" },
                 categoryId = state.categoryId,
                 photoPath = state.photoPath,
                 productionDate = state.productionDate,

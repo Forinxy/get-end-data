@@ -97,12 +97,14 @@ object NotificationHelper {
      * @param context 上下文
      * @param pendingCount 待处理清单数量
      * @param returnableCount 可退货清单数量
+     * @param takeDownCount 可下架清单数量
      * @param expiredCount 已过期清单数量
      */
     fun sendPendingNotification(
         context: Context,
         pendingCount: Int,
         returnableCount: Int = 0,
+        takeDownCount: Int = 0,
         expiredCount: Int = 0
     ) {
         if (pendingCount <= 0) return
@@ -117,6 +119,9 @@ object NotificationHelper {
 
         val contentText = buildString {
             append("有 $pendingCount 个清单待处理")
+            if (takeDownCount > 0) {
+                append("，其中 $takeDownCount 个可下架")
+            }
             if (returnableCount > 0) {
                 append("，其中 $returnableCount 个可退货")
             }
@@ -127,6 +132,9 @@ object NotificationHelper {
 
         val bigText = buildString {
             appendLine("今日待处理：$pendingCount 个清单")
+            if (takeDownCount > 0) {
+                appendLine("可下架：$takeDownCount 个")
+            }
             if (returnableCount > 0) {
                 appendLine("可退货：$returnableCount 个")
             }

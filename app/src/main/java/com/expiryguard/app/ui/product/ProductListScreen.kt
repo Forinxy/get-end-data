@@ -693,6 +693,7 @@ private fun FilterChipsRow(
                         ProductFilter.SAFE -> Green500.copy(alpha = 0.15f)
                         ProductFilter.EXPIRING_SOON -> Yellow500.copy(alpha = 0.15f)
                         ProductFilter.RETURNABLE -> Blue500.copy(alpha = 0.15f)
+                        ProductFilter.TAKEDOWN -> Red500.copy(alpha = 0.15f)
                         ProductFilter.EXPIRED -> Gray500.copy(alpha = 0.15f)
                     }
                 ),
@@ -922,7 +923,7 @@ private fun GridProductCard(
             is ProductStatus.Safe -> Green500
             is ProductStatus.ExpiringSoon -> Yellow500
             is ProductStatus.Returnable -> Blue500
-            is ProductStatus.Urgent -> Red500
+            is ProductStatus.TakeDown -> Red500
             is ProductStatus.Expired -> Gray500
         }
     }

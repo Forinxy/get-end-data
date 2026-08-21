@@ -97,7 +97,7 @@ private fun statusToColor(status: ProductStatus): Color {
         is ProductStatus.Safe -> Green500
         is ProductStatus.ExpiringSoon -> Yellow500
         is ProductStatus.Returnable -> Blue500
-        is ProductStatus.Urgent -> Red500
+        is ProductStatus.TakeDown -> Red500
         is ProductStatus.Expired -> Red700
     }
 }
@@ -269,6 +269,8 @@ fun HomeScreen(
 
 /**
  * 展示标记完成/取消完成的提示，并提供撤销入口，防止误触
+ *
+ * 处理方式按状态区分：可下架 → 下架；可退货 → 退货处理；其余 → 完成
  */
 private fun showCompletionSnackbar(
     scope: kotlinx.coroutines.CoroutineScope,
@@ -278,10 +280,11 @@ private fun showCompletionSnackbar(
     onUndo: () -> Unit
 ) {
     scope.launch {
+        val actionLabel = markActionLabel(product)
         val message = if (isCompleted) {
-            "已标记「${product.name}」完成"
+            "已标记「${product.name}」$actionLabel"
         } else {
-            "已取消「${product.name}」的完成标记"
+            "已取消「${product.name}」的标记"
         }
         val result = snackbarHostState.showSnackbar(
             message = message,
@@ -291,6 +294,32 @@ private fun showCompletionSnackbar(
         if (result == SnackbarResult.ActionPerformed) {
             onUndo()
         }
+    }
+}
+
+/**
+ * 处理动作文字（用于滑动提示与完成提示）
+ * 可下架 → 下架；可退货 → 退货处理；其余 → 完成
+ */
+private fun markActionLabel(product: ProductEntity): String {
+    val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
+    return when (status) {
+        is ProductStatus.TakeDown -> "下架"
+        is ProductStatus.Returnable -> "退货处理"
+        else -> "完成"
+    }
+}
+
+/**
+ * 已完成标签文字（用于绿色已处理徽标）
+ * 可下架 → 已下架；可退货 → 已退货处理；其余 → 已处理
+ */
+private fun completedLabelFor(product: ProductEntity): String {
+    val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
+    return when (status) {
+        is ProductStatus.TakeDown -> "已下架"
+        is ProductStatus.Returnable -> "已退货处理"
+        else -> "已处理"
     }
 }
 
@@ -605,6 +634,13 @@ private fun TaskCard(
     // 已处理时用绿色压过原始状态色
     val statusColor = if (isCompleted) Green500 else statusToColor(productStatus)
 
+    // 滑动动作提示：可下架 → 下架；可退货 → 退货处理；其余 → 完成
+    val swipeLabel = when {
+        productStatus is ProductStatus.TakeDown -> "滑动标记下架"
+        productStatus is ProductStatus.Returnable -> "滑动标记退货"
+        else -> "滑动标记完成"
+    }
+
     // 滑动阈值：需滑动超过卡片宽度的 65% 才触发，避免轻滑误触
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -648,7 +684,7 @@ private fun TaskCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isCompleted) "滑动取消完成" else "滑动标记完成",
+                        text = if (isCompleted) "滑动取消完成" else swipeLabel,
                         style = MaterialTheme.typography.labelMedium,
                         color = if (isCompleted) Gray500 else Green500,
                         fontWeight = FontWeight.SemiBold
@@ -719,6 +755,10 @@ private fun TaskCard(
                                     DateUtils.daysBetween(today, product.expiryDate)
                                 }
                                 val daysText = when {
+                                    productStatus is ProductStatus.TakeDown -> {
+                                        val t = productStatus as ProductStatus.TakeDown
+                                        "可下架 · 到期还有${t.remainingDays}天"
+                                    }
                                     productStatus is ProductStatus.Returnable -> {
                                         val r = productStatus as ProductStatus.Returnable
                                         val returnDeadlineDays = (r.remainingDays - r.threshold).coerceAtLeast(0)
@@ -734,6 +774,7 @@ private fun TaskCard(
                                     else -> "剩余 ${daysLeft}天"
                                 }
                                 val daysColor = when {
+                                    productStatus is ProductStatus.TakeDown -> Red500
                                     productStatus is ProductStatus.Returnable -> Blue500
                                     daysLeft < 0 -> Red500
                                     daysLeft <= 1 -> Orange500
@@ -757,9 +798,9 @@ private fun TaskCard(
                                 )
                             }
 
-                            // 状态标签：已处理时显示绿色"已处理"，否则显示原始状态
+                            // 状态标签：已处理时显示绿色处理徽标（下架/退货处理/已处理），否则显示原始状态
                             if (isCompleted) {
-                                StatusBadgeCompleted()
+                                StatusBadgeCompleted(label = completedLabelFor(product))
                             } else {
                                 StatusBadge(status = productStatus)
                             }
@@ -807,11 +848,13 @@ private fun ProductDetailSheet(
     val daysText = when {
         daysLeft < 0 -> "已过期 ${-daysLeft}天"
         daysLeft == 0 -> "今天到期"
+        status is ProductStatus.TakeDown -> "可下架 · 到期还有${status.remainingDays}天"
         daysLeft == 1 -> "明天到期（预警）"
         else -> "剩余 ${daysLeft}天"
     }
     val daysColor = when {
         daysLeft < 0 -> Red500
+        status is ProductStatus.TakeDown -> Red500
         daysLeft <= 1 -> Orange500
         daysLeft <= 3 -> Yellow500
         else -> Green500
@@ -918,6 +961,16 @@ private fun ProductDetailSheet(
             }
         }
 
+        // 可下架信息
+        if (status is ProductStatus.TakeDown) {
+            Spacer(modifier = Modifier.height(10.dp))
+            DetailInfoRow(
+                label = "可下架",
+                value = "到期前两天内，请取下架处理",
+                valueColor = Red500
+            )
+        }
+
         // 生产日期
         if (product.productionDate != null) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -974,8 +1027,13 @@ private fun ProductDetailSheet(
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
+            val markButtonLabel = when {
+                status is ProductStatus.TakeDown -> "标记已下架"
+                status is ProductStatus.Returnable -> "标记已退货处理"
+                else -> "标记已处理"
+            }
             Text(
-                text = if (product.isCompleted) "取消完成" else "标记已处理",
+                text = if (product.isCompleted) "取消完成" else markButtonLabel,
                 style = MaterialTheme.typography.titleSmall
             )
         }
@@ -1012,10 +1070,10 @@ private fun DetailInfoRow(
 }
 
 /**
- * 已处理状态标签 — 绿色"已处理"压过原始过期/紧急标记
+ * 已处理状态标签 — 绿色处理徽标（已处理 / 已下架 / 已退货处理）
  */
 @Composable
-private fun StatusBadgeCompleted() {
+private fun StatusBadgeCompleted(label: String = "已处理") {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -1053,7 +1111,7 @@ private fun StatusBadgeCompleted() {
         )
         Spacer(modifier = Modifier.width(5.dp))
         Text(
-            text = "已处理",
+            text = label,
             color = Green500.copy(alpha = 0.95f),
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold

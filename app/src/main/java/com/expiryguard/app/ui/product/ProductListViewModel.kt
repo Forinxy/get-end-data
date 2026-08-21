@@ -21,6 +21,7 @@ enum class ProductFilter(val label: String) {
     SAFE("安全"),
     EXPIRING_SOON("即将到期"),
     RETURNABLE("可退货"),
+    TAKEDOWN("可下架"),
     EXPIRED("已过期")
 }
 
@@ -116,6 +117,10 @@ class ProductListViewModel @Inject constructor(
             ProductFilter.RETURNABLE -> products.filter {
                 val status = ExpiryRuleEngine.calculateStatus(it.shelfLifeDays, it.expiryDate)
                 status is ProductStatus.Returnable
+            }
+            ProductFilter.TAKEDOWN -> products.filter {
+                val status = ExpiryRuleEngine.calculateStatus(it.shelfLifeDays, it.expiryDate)
+                status is ProductStatus.TakeDown
             }
             ProductFilter.EXPIRED -> products.filter {
                 DateUtils.daysBetween(today, it.expiryDate) <= 0

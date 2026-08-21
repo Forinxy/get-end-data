@@ -14,13 +14,15 @@ import com.expiryguard.app.util.DateUtils
  */
 data class PendingGroups(
     val todayExpiry: List<ProductEntity>,
+    val takeDown: List<ProductEntity>,
     val returnable: List<ProductEntity>,
     val expired: List<ProductEntity>,
     val warning: List<ProductEntity>
 ) {
-    /** 今日待办总数量（今日到期 + 可退货 + 已过期 + 预警，已去重） */
+    /** 今日待办总数量（今日到期 + 可下架 + 可退货 + 已过期 + 预警，已去重） */
     val totalCount: Int
-        get() = (todayExpiry.map { it.id } + returnable.map { it.id } +
+        get() = (todayExpiry.map { it.id } + takeDown.map { it.id } +
+                returnable.map { it.id } +
                 expired.map { it.id } + warning.map { it.id }).toSet().size
 }
 
@@ -33,7 +35,7 @@ object ExpiryRuleEngine {
 
     /**
      * 「即将到期」预警窗口天数：短保质期产品（退货阈值=0）在到期前这段天数内
-     * 标记为即将到期，填补「安全」到「紧急」之间的渐进预警
+     * 标记为即将到期，填补「安全」到「可下架」之间的渐进预警
      */
     private const val EXPIRING_SOON_WINDOW_DAYS = 30
 
@@ -69,9 +71,9 @@ object ExpiryRuleEngine {
             return ProductStatus.Expired(daysOverdue = -remainingDays)
         }
 
-        // 紧急状态：剩余天数 <= 3
-        if (remainingDays <= 3) {
-            return ProductStatus.Urgent(remainingDays = remainingDays)
+        // 可下架状态：到期前两天内（剩余 1~2 天），需取下架
+        if (remainingDays <= 2) {
+            return ProductStatus.TakeDown(remainingDays = remainingDays)
         }
 
         val effectiveThreshold = returnThreshold ?: getReturnThreshold(shelfLifeDays)
@@ -86,7 +88,7 @@ object ExpiryRuleEngine {
         }
 
         // 即将到期：短保质期产品（退货阈值=0，如保质期<3个月）无退货窗口，
-        // 用该状态填补「安全」到「紧急」之间的渐进预警（剩余 4~30 天）
+        // 用该状态填补「安全」到「可下架」之间的渐进预警（剩余 3~30 天）
         if (effectiveThreshold == 0 && remainingDays <= EXPIRING_SOON_WINDOW_DAYS) {
             return ProductStatus.ExpiringSoon(remainingDays = remainingDays)
         }
@@ -117,14 +119,15 @@ object ExpiryRuleEngine {
     }
 
     /**
-     * 计算待办清单分组（今日到期 / 可退货 / 已过期 / 预警），
+     * 计算待办清单分组（今日到期 / 可下架 / 可退货 / 已过期 / 预警），
      * 首页今日待办与启动通知使用同一口径，保证数量一致。
      *
      * 口径：
      * - 今日到期：到期日期是今天
+     * - 可下架：状态为 TakeDown（剩余 1~2 天，需取下架）
      * - 可退货：状态为 Returnable
      * - 已过期：到期日期已过
-     * - 预警：还剩1天到期，且不在上述三组中
+     * - 预警：还剩1天到期，且不在上述分组中
      *
      * @param products 全部活跃清单
      * @param today 今天零点时间戳
@@ -133,6 +136,12 @@ object ExpiryRuleEngine {
         // 今日到期：到期日期是今天
         val todayExpiry = products.filter {
             DateUtils.isToday(it.expiryDate) && !it.isCompleted
+        }
+
+        // 可下架清单：剩余 1~2 天，需取下架
+        val takeDown = products.filter { product ->
+            val status = calculateStatus(product.shelfLifeDays, product.expiryDate)
+            status is ProductStatus.TakeDown && !product.isCompleted
         }
 
         // 可退货清单：根据规则1，到期前阈值天时放入待办
@@ -147,8 +156,9 @@ object ExpiryRuleEngine {
             days < 0 && !it.isCompleted
         }
 
-        // 今日到期（含可退货、已过期）—— 合并去重
+        // 今日到期（含可下架、可退货、已过期）—— 合并去重
         val todayWithReturnableIds = (todayExpiry.map { it.id } +
+                takeDown.map { it.id } +
                 returnable.map { it.id } +
                 expired.map { it.id }).toSet()
 
@@ -160,6 +170,7 @@ object ExpiryRuleEngine {
 
         return PendingGroups(
             todayExpiry = todayExpiry,
+            takeDown = takeDown,
             returnable = returnable,
             expired = expired,
             warning = warning

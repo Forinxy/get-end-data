@@ -157,11 +157,11 @@ fun DateInputField(
                 isError = parseError,
                 supportingText = {
                     if (parseError) {
-                        Text("格式无法识别，示例：2019.1.1 / 2019年1月1日 / 2019 1 1")
+                        Text("格式无法识别，示例：1.1 / 1月1日 / 2019.1.1")
                     } else if (isParsed != null) {
                         Text("已识别：${isParsed.year}年${isParsed.monthValue}月${isParsed.dayOfMonth}日", color = Green500)
                     } else {
-                        Text("可直接输入日期，如 2019.1.1 或 2019年1月1日")
+                        Text("只填几月几日即可，年份默认今年，如 1.1 或 1月1日")
                     }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),

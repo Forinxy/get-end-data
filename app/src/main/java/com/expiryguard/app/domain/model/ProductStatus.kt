@@ -28,11 +28,11 @@ sealed class ProductStatus {
     data class Returnable(val remainingDays: Int, val threshold: Int) : ProductStatus()
 
     /**
-     * 紧急状态：剩余天数很少（<=3天），需立即处理
+     * 可下架状态：到期前两天内，需将商品从货架取下
      *
      * @param remainingDays 距离到期剩余天数
      */
-    data class Urgent(val remainingDays: Int) : ProductStatus()
+    data class TakeDown(val remainingDays: Int) : ProductStatus()
 
     /**
      * 已过期状态

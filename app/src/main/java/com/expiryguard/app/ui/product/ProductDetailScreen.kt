@@ -455,7 +455,7 @@ private fun InfoRow(
  * 根据清单状态显示对应的提示信息：
  * - 可退货：显示退货窗口天数
  * - 已过期：显示过期天数
- * - 紧急：提醒尽快处理
+ * - 可下架：提醒尽快取下架
  *
  * @param status 清单状态
  * @param expiryDate 到期日期
@@ -475,7 +475,7 @@ private fun StatusSection(
                 is ProductStatus.Safe -> Green500.copy(alpha = 0.08f)
                 is ProductStatus.ExpiringSoon -> Yellow500.copy(alpha = 0.08f)
                 is ProductStatus.Returnable -> Blue500.copy(alpha = 0.08f)
-                is ProductStatus.Urgent -> Red500.copy(alpha = 0.08f)
+                is ProductStatus.TakeDown -> Red500.copy(alpha = 0.08f)
                 is ProductStatus.Expired -> Gray500.copy(alpha = 0.08f)
             }
         )
@@ -529,16 +529,16 @@ private fun StatusSection(
                     )
                 }
 
-                is ProductStatus.Urgent -> {
+                is ProductStatus.TakeDown -> {
                     Text(
-                        text = "紧急处理",
+                        text = "可下架",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = Red500
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "仅剩 ${status.remainingDays} 天，请立即处理！",
+                        text = "仅剩 ${status.remainingDays} 天，请取下架处理！",
                         style = MaterialTheme.typography.bodySmall,
                         color = Red500
                     )
