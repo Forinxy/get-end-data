@@ -33,6 +33,7 @@ data class SettingsUiState(
     val autoCleanupDays: Int = 30,
     val isDarkModeEnabled: Boolean = false,
     val isMonetEnabled: Boolean = false,
+    val takeDownDays: Int = 2,
     val appVersion: String = "1.0.0"
 )
 
@@ -58,6 +59,7 @@ class SettingsViewModel @Inject constructor(
         private val KEY_AUTO_CLEANUP_DAYS = intPreferencesKey("auto_cleanup_days")
         private val KEY_DARK_MODE_ENABLED = booleanPreferencesKey("dark_mode_enabled")
         private val KEY_MONET_ENABLED = booleanPreferencesKey("monet_enabled")
+        private val KEY_TAKE_DOWN_DAYS = intPreferencesKey("take_down_days")
     }
 
     init {
@@ -70,6 +72,7 @@ class SettingsViewModel @Inject constructor(
                     autoCleanupDays = preferences[KEY_AUTO_CLEANUP_DAYS] ?: 30,
                     isDarkModeEnabled = preferences[KEY_DARK_MODE_ENABLED] ?: false,
                     isMonetEnabled = preferences[KEY_MONET_ENABLED] ?: false,
+                    takeDownDays = preferences[KEY_TAKE_DOWN_DAYS] ?: 2,
                     appVersion = "1.0.0"
                 )
             }
@@ -134,6 +137,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.edit { preferences ->
                 preferences[KEY_AUTO_CLEANUP_DAYS] = days
+            }
+        }
+    }
+
+    /**
+     * 更改取件天数（到期前多少天进入「可下架」状态）
+     *
+     * @param days 取件天数，最小值为 1
+     */
+    fun changeTakeDownDays(days: Int) {
+        viewModelScope.launch {
+            dataStore.edit { preferences ->
+                preferences[KEY_TAKE_DOWN_DAYS] = days.coerceAtLeast(1)
             }
         }
     }

@@ -47,32 +47,35 @@ object ExpiryRuleEngine {
      * @return 对应的 ProductStatus
      */
     fun calculateStatus(shelfLifeDays: Int, expiryDate: Long): ProductStatus {
-        return calculateStatus(shelfLifeDays, expiryDate, null)
+        return calculateStatus(shelfLifeDays, expiryDate, null, null)
     }
 
     /**
-     * 计算产品当前状态（支持自定义退货阈值）
+     * 计算产品当前状态（支持自定义退货阈值与取件阈值）
      *
      * @param shelfLifeDays 保质期天数（用于计算默认阈值）
      * @param expiryDate 到期日期时间戳（毫秒）
      * @param returnThreshold 自定义退货阈值天数，为 null 时使用硬编码默认值
+     * @param takeDownThreshold 自定义取件阈值天数（距到期前多少天进入「可下架」状态），为 null 时使用硬编码默认值 2
      * @return 对应的 ProductStatus
      */
     fun calculateStatus(
         shelfLifeDays: Int,
         expiryDate: Long,
-        returnThreshold: Int?
+        returnThreshold: Int?,
+        takeDownThreshold: Int?
     ): ProductStatus {
         val now = DateUtils.todayTimestamp()
         val remainingDays = DateUtils.daysBetween(now, expiryDate)
+        val takeDownDays = takeDownThreshold ?: 2
 
         // 已过期
         if (remainingDays <= 0) {
             return ProductStatus.Expired(daysOverdue = -remainingDays)
         }
 
-        // 可下架状态：到期前两天内（剩余 1~2 天），需取下架
-        if (remainingDays <= 2) {
+        // 可下架状态：距到期不超过取件阈值天，需取下架
+        if (remainingDays <= takeDownDays) {
             return ProductStatus.TakeDown(remainingDays = remainingDays)
         }
 
@@ -95,6 +98,22 @@ object ExpiryRuleEngine {
 
         // 安全状态
         return ProductStatus.Safe(remainingDays = remainingDays)
+    }
+
+    /**
+     * 计算产品当前状态（使用硬编码默认阈值）
+     *
+     * @param shelfLifeDays 保质期天数（用于计算默认阈值）
+     * @param expiryDate 到期日期时间戳（毫秒）
+     * @param takeDownThreshold 自定义取件阈值天数，为 null 时使用硬编码默认值 2
+     * @return 对应的 ProductStatus
+     */
+    fun calculateStatus(
+        shelfLifeDays: Int,
+        expiryDate: Long,
+        takeDownThreshold: Int?
+    ): ProductStatus {
+        return calculateStatus(shelfLifeDays, expiryDate, null, takeDownThreshold)
     }
 
     /**
@@ -132,21 +151,21 @@ object ExpiryRuleEngine {
      * @param products 全部活跃清单
      * @param today 今天零点时间戳
      */
-    fun computePendingGroups(products: List<ProductEntity>, today: Long): PendingGroups {
+    fun computePendingGroups(products: List<ProductEntity>, today: Long, takeDownThreshold: Int? = null): PendingGroups {
         // 今日到期：到期日期是今天
         val todayExpiry = products.filter {
             DateUtils.isToday(it.expiryDate) && !it.isCompleted
         }
 
-        // 可下架清单：剩余 1~2 天，需取下架
+        // 可下架清单：剩余天数 <= 取件阈值，需取下架
         val takeDown = products.filter { product ->
-            val status = calculateStatus(product.shelfLifeDays, product.expiryDate)
+            val status = calculateStatus(product.shelfLifeDays, product.expiryDate, takeDownThreshold)
             status is ProductStatus.TakeDown && !product.isCompleted
         }
 
         // 可退货清单：根据规则1，到期前阈值天时放入待办
         val returnable = products.filter { product ->
-            val status = calculateStatus(product.shelfLifeDays, product.expiryDate)
+            val status = calculateStatus(product.shelfLifeDays, product.expiryDate, takeDownThreshold)
             status is ProductStatus.Returnable && !product.isCompleted
         }
 

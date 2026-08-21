@@ -1,6 +1,7 @@
 package com.expiryguard.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -203,21 +205,34 @@ fun HomeScreen(
                             warning = uiState.warning,
                             todayCompleted = uiState.todayCompleted,
                             previousCompleted = uiState.previousCompleted,
-                            onTaskCompleted = { product, isCompleted ->
-                                viewModel.toggleProductCompletion(product.id, isCompleted)
-                                showCompletionSnackbar(
-                                    scope = scope,
-                                    snackbarHostState = snackbarHostState,
-                                    product = product,
-                                    isCompleted = isCompleted,
-                                    onUndo = {
-                                        viewModel.toggleProductCompletion(product.id, false)
-                                    }
-                                )
-                            },
-                            onTaskClick = { product ->
-                                selectedProduct = product
-                            }
+                             onTaskCompleted = { product, isCompleted ->
+                                 viewModel.toggleProductCompletion(product.id, isCompleted)
+                                 showCompletionSnackbar(
+                                     scope = scope,
+                                     snackbarHostState = snackbarHostState,
+                                     product = product,
+                                     isCompleted = isCompleted,
+                                     onUndo = {
+                                         viewModel.toggleProductCompletion(product.id, false)
+                                     }
+                                 )
+                             },
+                             onTaskLongPress = { product ->
+                                 viewModel.toggleProductCompletion(product.id, true)
+                                 showCompletionSnackbar(
+                                     scope = scope,
+                                     snackbarHostState = snackbarHostState,
+                                     product = product,
+                                     isCompleted = true,
+                                     onUndo = {
+                                         viewModel.toggleProductCompletion(product.id, false)
+                                     },
+                                     isLongPress = true
+                                 )
+                             },
+                             onTaskClick = { product ->
+                                 selectedProduct = product
+                             }
                         )
                     }
                 }
@@ -277,12 +292,14 @@ private fun showCompletionSnackbar(
     snackbarHostState: SnackbarHostState,
     product: ProductEntity,
     isCompleted: Boolean,
-    onUndo: () -> Unit
+    onUndo: () -> Unit,
+    isLongPress: Boolean = false
 ) {
     scope.launch {
         val actionLabel = markActionLabel(product)
+        val triggerText = if (isLongPress) "长按" else "滑动"
         val message = if (isCompleted) {
-            "已标记「${product.name}」$actionLabel"
+            "已「$triggerText」标记「${product.name}」$actionLabel"
         } else {
             "已取消「${product.name}」的标记"
         }
@@ -471,7 +488,8 @@ private fun LazyListScope.todayTasksSection(
     todayCompleted: List<ProductEntity>,
     previousCompleted: List<ProductEntity>,
     onTaskCompleted: (ProductEntity, Boolean) -> Unit,
-    onTaskClick: (ProductEntity) -> Unit
+    onTaskClick: (ProductEntity) -> Unit,
+    onTaskLongPress: (ProductEntity) -> Unit
 ) {
     // 合并今日到期 + 预警（还剩1天），按到期日期排序
     val todayTasks = (todayExpiry + warning)
@@ -537,6 +555,7 @@ private fun LazyListScope.todayTasksSection(
                 onSwipeComplete = {
                     onTaskCompleted(product, true)
                 },
+                onLongPress = { onTaskLongPress(product) },
                 onClick = { onTaskClick(product) }
             )
         }
@@ -574,6 +593,7 @@ private fun LazyListScope.todayTasksSection(
                     onSwipeComplete = {
                         onTaskCompleted(product, false)
                     },
+                    onLongPress = { onTaskLongPress(product) },
                     onClick = { onTaskClick(product) }
                 )
             }
@@ -612,6 +632,7 @@ private fun LazyListScope.todayTasksSection(
                     onSwipeComplete = {
                         onTaskCompleted(product, false)
                     },
+                    onLongPress = { onTaskLongPress(product) },
                     onClick = { onTaskClick(product) }
                 )
             }
@@ -628,6 +649,7 @@ private fun TaskCard(
     product: ProductEntity,
     isCompleted: Boolean,
     onSwipeComplete: () -> Unit,
+    onLongPress: () -> Unit,
     onClick: () -> Unit
 ) {
     val productStatus = remember { ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate) }
@@ -689,13 +711,27 @@ private fun TaskCard(
                         color = if (isCompleted) Gray500 else Green500,
                         fontWeight = FontWeight.SemiBold
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    if (!isCompleted) {
+                        Text(
+                            text = "· 长按同效",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Green500.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
         },
         content = {
             GlassCard(
                 onClick = onClick,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(product.id) {
+                        detectTapGestures(onLongPress = {
+                            onLongPress()
+                        })
+                    },
                 shape = RoundedCornerShape(12.dp),
                 elevation = 2.dp,
                 statusColor = statusColor

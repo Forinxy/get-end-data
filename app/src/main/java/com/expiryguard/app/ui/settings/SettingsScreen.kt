@@ -83,6 +83,8 @@ fun SettingsScreen(
 
     // 自动清理天数选择对话框
     var showAutoCleanupDialog by remember { mutableStateOf(false) }
+    // 取件天数选择对话框
+    var showTakeDownDaysDialog by remember { mutableStateOf(false) }
     // 导出格式选择对话框
     var showExportDialog by remember { mutableStateOf(false) }
 
@@ -197,6 +199,15 @@ fun SettingsScreen(
                         onClick = { showAutoCleanupDialog = true }
                     )
                 }
+                item(key = "card_take_down_days") {
+                    SettingsCard(
+                        icon = Icons.Default.Settings,
+                        iconTint = Orange500,
+                        title = "取件天数",
+                        subtitle = "到期前 ${uiState.takeDownDays} 天内提醒取件下架",
+                        onClick = { showTakeDownDaysDialog = true }
+                    )
+                }
 
                 // 关于
                 item(key = "section_about") {
@@ -229,6 +240,18 @@ fun SettingsScreen(
                 showAutoCleanupDialog = false
             },
             onDismiss = { showAutoCleanupDialog = false }
+        )
+    }
+
+    // 取件天数选择对话框
+    if (showTakeDownDaysDialog) {
+        TakeDownDaysDialog(
+            currentDays = uiState.takeDownDays,
+            onSelect = { days ->
+                viewModel.changeTakeDownDays(days)
+                showTakeDownDaysDialog = false
+            },
+            onDismiss = { showTakeDownDaysDialog = false }
         )
     }
 
@@ -439,6 +462,60 @@ private fun AutoCleanupDialog(
                     ) {
                         Text(
                             text = label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                            color = if (days == currentDays) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            fontWeight = if (days == currentDays) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 取件天数选择对话框
+ */
+@Composable
+private fun TakeDownDaysDialog(
+    currentDays: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(1, 2, 3, 5, 7)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("取件天数") },
+        text = {
+            Column {
+                Text(
+                    text = "选择到期前多少天进入「可下架」状态（提醒取件）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                options.forEach { days ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSelect(days) }
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (days == 1) "1 天（仅今天）" else "$days 天内",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f),
                             color = if (days == currentDays) {
