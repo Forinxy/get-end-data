@@ -94,8 +94,9 @@ class HomeViewModel @Inject constructor(
      * 在 Default 线程执行，主线程只负责接收结果
      */
     private fun processProducts(products: List<ProductEntity>, today: Long): HomeUiState {
-        // 统一口径分组（与启动通知一致）
-        val groups = ExpiryRuleEngine.computePendingGroups(products, today)
+        // 统一口径分组（与启动通知一致）—— 使用引擎静态阈值，确保与设置页同步
+        val takeDownThreshold = ExpiryRuleEngine.takeDownThreshold
+        val groups = ExpiryRuleEngine.computePendingGroups(products, today, takeDownThreshold)
 
         // 今日到期（含可下架、可退货、已过期）—— 合并去重
         val todayWithReturnable = (groups.todayExpiry + groups.takeDown + groups.returnable + groups.expired).distinctBy { it.id }

@@ -728,20 +728,22 @@ private fun TaskCard(
             }
         },
         content = {
-            GlassCard(
-                onClick = onClick,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .pointerInput(product.id) {
-                        // 使用 detectDragGesturesAfterLongPress 实现长按检测
-                        // 当检测到长按（超过 500ms）且没有拖动时，触发 onLongPress
+                        // 长按检测：在 SwipeToDismissBox 外层，不受 GlassCard clickable 影响
                         detectDragGesturesAfterLongPress(
                             { onLongPress() },
                             {},
                             {},
                             { _, _ -> }
                         )
-                    },
+                    }
+            ) {
+            GlassCard(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 elevation = 2.dp,
                 statusColor = statusColor
@@ -868,7 +870,8 @@ private fun TaskCard(
                 }
             }
         }
-    )
+    }
+)
 }
 
 /**
