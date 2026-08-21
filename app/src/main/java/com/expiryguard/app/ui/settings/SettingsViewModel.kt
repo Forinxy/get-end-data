@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expiryguard.app.data.repository.ProductRepository
+import com.expiryguard.app.domain.engine.ExpiryRuleEngine
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -105,6 +106,18 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
+     * 更新取件天数
+     */
+    fun changeTakeDownDays(days: Int) {
+        viewModelScope.launch {
+            dataStore.edit { preferences ->
+                preferences[KEY_TAKE_DOWN_DAYS] = days.coerceAtLeast(1)
+            }
+            ExpiryRuleEngine.updateTakeDownThreshold(days)
+        }
+    }
+
+    /**
      * 切换深色模式
      */
     fun toggleDarkMode() {
@@ -137,19 +150,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.edit { preferences ->
                 preferences[KEY_AUTO_CLEANUP_DAYS] = days
-            }
-        }
-    }
-
-    /**
-     * 更改取件天数（到期前多少天进入「可下架」状态）
-     *
-     * @param days 取件天数，最小值为 1
-     */
-    fun changeTakeDownDays(days: Int) {
-        viewModelScope.launch {
-            dataStore.edit { preferences ->
-                preferences[KEY_TAKE_DOWN_DAYS] = days.coerceAtLeast(1)
             }
         }
     }

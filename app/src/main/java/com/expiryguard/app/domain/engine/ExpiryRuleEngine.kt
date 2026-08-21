@@ -34,6 +34,21 @@ data class PendingGroups(
 object ExpiryRuleEngine {
 
     /**
+     * 取件天数配置（距到期前多少天进入「可下架」状态），默认 2 天
+     * SettingsViewModel 写入，所有计算调用方无需改动自动读取
+     */
+    @Volatile
+    var takeDownThreshold: Int = 2
+        private set
+
+    /**
+     * 更新取件天数，由 SettingsViewModel 调用
+     */
+    fun updateTakeDownThreshold(days: Int) {
+        takeDownThreshold = days.coerceAtLeast(1)
+    }
+
+    /**
      * 「即将到期」预警窗口天数：短保质期产品（退货阈值=0）在到期前这段天数内
      * 标记为即将到期，填补「安全」到「可下架」之间的渐进预警
      */
@@ -67,15 +82,13 @@ object ExpiryRuleEngine {
     ): ProductStatus {
         val now = DateUtils.todayTimestamp()
         val remainingDays = DateUtils.daysBetween(now, expiryDate)
-        val takeDownDays = takeDownThreshold ?: 2
-
         // 已过期
         if (remainingDays <= 0) {
             return ProductStatus.Expired(daysOverdue = -remainingDays)
         }
-
         // 可下架状态：距到期不超过取件阈值天，需取下架
-        if (remainingDays <= takeDownDays) {
+        val effectiveTakeDownThreshold = takeDownThreshold ?: this@ExpiryRuleEngine.takeDownThreshold
+        if (remainingDays <= effectiveTakeDownThreshold) {
             return ProductStatus.TakeDown(remainingDays = remainingDays)
         }
 

@@ -1,8 +1,9 @@
 package com.expiryguard.app.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -663,6 +664,10 @@ private fun TaskCard(
         else -> "滑动标记完成"
     }
 
+    // 提前捕获长按阈值（pointerInput lambda 不能调用 Composable）
+    // Android 标准长按超时为 500ms
+    val longPressThreshold = 500L
+
     // 滑动阈值：需滑动超过卡片宽度的 65% 才触发，避免轻滑误触
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -728,9 +733,14 @@ private fun TaskCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .pointerInput(product.id) {
-                        detectTapGestures(onLongPress = {
-                            onLongPress()
-                        })
+                        // 使用 detectDragGesturesAfterLongPress 实现长按检测
+                        // 当检测到长按（超过 500ms）且没有拖动时，触发 onLongPress
+                        detectDragGesturesAfterLongPress(
+                            { onLongPress() },
+                            {},
+                            {},
+                            { _, _ -> }
+                        )
                     },
                 shape = RoundedCornerShape(12.dp),
                 elevation = 2.dp,
