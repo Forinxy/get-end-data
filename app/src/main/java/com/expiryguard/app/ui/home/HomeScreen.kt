@@ -1,10 +1,10 @@
 package com.expiryguard.app.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,7 +61,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -644,7 +643,7 @@ private fun LazyListScope.todayTasksSection(
 /**
  * 待办任务卡片
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun TaskCard(
     product: ProductEntity,
@@ -663,10 +662,6 @@ private fun TaskCard(
         productStatus is ProductStatus.Returnable -> "滑动标记退货"
         else -> "滑动标记完成"
     }
-
-    // 提前捕获长按阈值（pointerInput lambda 不能调用 Composable）
-    // Android 标准长按超时为 500ms
-    val longPressThreshold = 500L
 
     // 滑动阈值：需滑动超过卡片宽度的 65% 才触发，避免轻滑误触
     val dismissState = rememberSwipeToDismissBoxState(
@@ -731,23 +726,17 @@ private fun TaskCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(product.id) {
-                        // 长按检测：在 SwipeToDismissBox 外层，不受 GlassCard clickable 影响
-                        detectDragGesturesAfterLongPress(
-                            { onLongPress() },
-                            {},
-                            {},
-                            { _, _ -> }
-                        )
-                    }
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongPress
+                    )
             ) {
-            GlassCard(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                elevation = 2.dp,
-                statusColor = statusColor
-            ) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = 2.dp,
+                    statusColor = statusColor
+                ) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
                 ) {

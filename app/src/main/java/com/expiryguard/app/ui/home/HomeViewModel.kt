@@ -2,6 +2,9 @@ package com.expiryguard.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import com.expiryguard.app.data.db.entity.ProductEntity
 import com.expiryguard.app.data.repository.ProductRepository
 import com.expiryguard.app.domain.engine.ExpiryRuleEngine
@@ -51,8 +54,13 @@ data class HomeUiState(
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: ProductRepository
+    private val repository: ProductRepository,
+    private val dataStore: DataStore<Preferences>
 ) : ViewModel() {
+
+    companion object {
+        private val KEY_TAKE_DOWN_DAYS = intPreferencesKey("take_down_days")
+    }
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -75,12 +83,17 @@ class HomeViewModel @Inject constructor(
      */
     private fun loadData() {
         viewModelScope.launch {
-            repository.getAllActiveProducts()
-                // 过滤、排序、去重等计算在 Default 线程执行，避免阻塞主线程
-                .map { products ->
-                    val today = DateUtils.todayTimestamp()
-                    processProducts(products, today)
-                }
+            // combine 监听产品数据 与 取件天数设置，任一变化时重新计算
+            // 这样修改「取件天数」后首页会立即重算「可下架」范围
+            combine(
+                repository.getAllActiveProducts(),
+                dataStore.data.map { prefs -> prefs[KEY_TAKE_DOWN_DAYS] ?: 2 }
+            ) { products, takeDownDays ->
+                // 同步取件阈值到引擎，确保分组、状态计算口径一致
+                ExpiryRuleEngine.updateTakeDownThreshold(takeDownDays)
+                val today = DateUtils.todayTimestamp()
+                processProducts(products, today)
+            }
                 .flowOn(Dispatchers.Default)
                 .collect { state ->
                     _uiState.value = state
