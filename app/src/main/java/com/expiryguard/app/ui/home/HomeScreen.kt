@@ -341,15 +341,15 @@ private fun completionTypeFor(product: ProductEntity): String? {
 
 /**
  * 长按切换后的 completedType：
- * 已标记「下架」→「退货处理」；已标记「退货处理」→「下架」；
+ * 已标记「下架」→「已处理」；已标记「已处理」→「下架」；
  * 未标记时按当前状态写入对应的 completedType
  */
 private fun toggledCompletionType(product: ProductEntity): String? {
     if (product.isCompleted) {
+        // 长按只在「已下架」与「已处理」两种标记间切换
         return when (product.completedType) {
-            ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> ProductEntity.COMPLETED_TYPE_RETURN
-            ProductEntity.COMPLETED_TYPE_RETURN -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
-            else -> completionTypeFor(product)
+            ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> null
+            else -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
         }
     }
     return completionTypeFor(product)
