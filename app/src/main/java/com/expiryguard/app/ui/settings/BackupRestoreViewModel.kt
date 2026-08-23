@@ -346,9 +346,10 @@ class BackupRestoreViewModel @Inject constructor(
                 }
                 val dataJson = dataFile.readText()
                 val backupDataType = object : TypeToken<BackupData>() {}.type
-                val backupData: BackupData = gson.fromJson(dataJson, backupDataType)
-                if (backupData == null) {
-                    throw Exception("备份文件数据解析失败")
+                val backupData: BackupData = try {
+                    gson.fromJson(dataJson, backupDataType) ?: throw Exception("备份文件数据解析失败")
+                } catch (e: com.google.gson.JsonSyntaxException) {
+                    throw Exception("备份文件格式不兼容（可能来自更旧版本）：${e.message}")
                 }
                 _restoreProgress.value = 0.3f
 

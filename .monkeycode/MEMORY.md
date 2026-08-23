@@ -56,3 +56,13 @@ Entries discovered by the Agent during task execution should follow this format:
   - 数据库无迁移链的极老版本（v1/v2）无法补 Migration（Room schema 校验失败会崩溃而非兜底），改用「破坏前自动备份」：buildDatabase 构建前检测版本<3 旧库，复制到应用目录并导出 Download/ExpiryGuard/，destructive 兜底触发前数据可找回
   - ExpiringSoon 状态已启用：退货阈值=0 的短保质期产品（保质期<90天）在剩余 4~30 天返回该状态，填补安全→紧急预警断层；列表「即将到期」筛选按状态匹配而非 days in 1..3
   - 首页待办与启动通知共用 ExpiryRuleEngine.computePendingGroups() 统一口径（今日到期+可退货+已过期+预警，已去重）
+
+[Project Knowledge Summary]
+- Date: 2026-08-23
+- Context: Discovered by Agent while implementing 长按下架↔退货切换 + 日期年份可选
+- Category: Build Methods
+- Instructions:
+  - 数据库 v5 迁移：products 表新增 completedType 字段（TEXT），取值 TAKE_DOWN=已下架 / RETURN=已退货处理 / null 未完成；旧数据 completedType 为 null 时 completedLabelFor 回退到按状态推断
+  - 长按切换逻辑：已完成商品在「已下架」↔「已退货处理」之间切换 completedType；未完成商品按当前状态写入对应 completedType
+  - 滑动标记完成时也应写入 completedType（按状态），保证列表/首页标签一致
+  - 日期选择器 yearRange 放开至 now.year±100，初始日期保留原年份（不再强制今年）

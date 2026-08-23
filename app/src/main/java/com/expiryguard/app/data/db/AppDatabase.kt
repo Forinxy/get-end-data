@@ -79,10 +79,13 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * 构建数据库
+         *
+         * 注意：不使用 fallbackToDestructiveMigration，任何版本升级前都先备份旧库，
+         * 避免迁移链断裂导致数据丢失。
          */
         private fun buildDatabase(context: Context): AppDatabase {
-            // 破坏性迁移兜底前先自动备份旧数据库，避免升级丢数据
-            backupLegacyDatabase(context)
+            // 构建前先备份旧数据库（任何版本变化都备份，确保可回滚）
+            backupDatabaseOnUpgrade(context)
 
             return Room.databaseBuilder(
                 context.applicationContext,
@@ -90,7 +93,6 @@ abstract class AppDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
-                .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
@@ -106,24 +108,21 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * 备份旧版本数据库文件。
+         * 数据库版本升级前备份旧库文件。
          *
-         * 仓库历史从 v3 开始，v1/v2 无迁移链可还原；若用户从未发布版本升级而来，
-         * `fallbackToDestructiveMigration` 会清空数据。此处先将旧库文件复制到应用文件目录，
-         * 并导出到公共 Download 目录，供用户手动找回数据。
+         * 任何版本变化（无论升级还是降级）都先复制旧库到应用目录并导出到 Download，
+         * 确保即使迁移失败也能手动找回数据。
          */
-        private fun backupLegacyDatabase(context: Context) {
+        private fun backupDatabaseOnUpgrade(context: Context) {
             try {
                 val dbFile = context.getDatabasePath(DATABASE_NAME)
                 if (!dbFile.exists()) return
 
-                // 读取现有数据库版本，仅当版本 < 3（无迁移链可覆盖）时才需要备份
                 val currentVersion = SQLiteDatabase.openDatabase(
                     dbFile.path, null, SQLiteDatabase.OPEN_READONLY
                 ).use { db ->
                     db.version
                 }
-                if (currentVersion >= 3) return
 
                 val backupDir = File(context.filesDir, "legacy_db_backup")
                 if (!backupDir.exists()) backupDir.mkdirs()
