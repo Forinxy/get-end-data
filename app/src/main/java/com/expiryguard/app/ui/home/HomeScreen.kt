@@ -206,26 +206,32 @@ fun HomeScreen(
                             todayCompleted = uiState.todayCompleted,
                             previousCompleted = uiState.previousCompleted,
                              onTaskCompleted = { product, isCompleted ->
-                                 viewModel.toggleProductCompletion(product.id, isCompleted)
+                                 val type = if (isCompleted) completionTypeFor(product) else null
+                                 viewModel.toggleProductCompletion(product.id, isCompleted, type)
                                  showCompletionSnackbar(
                                      scope = scope,
                                      snackbarHostState = snackbarHostState,
                                      product = product,
                                      isCompleted = isCompleted,
+                                     markLabel = if (isCompleted) completionLabelFor(type) else null,
                                      onUndo = {
-                                         viewModel.toggleProductCompletion(product.id, false)
+                                         viewModel.toggleProductCompletion(product.id, false, null)
                                      }
                                  )
                              },
                              onTaskLongPress = { product ->
-                                 viewModel.toggleProductCompletion(product.id, true)
+                                 val wasCompleted = product.isCompleted
+                                 val wasType = product.completedType
+                                 val newType = toggledCompletionType(product)
+                                 viewModel.toggleProductCompletion(product.id, true, newType)
                                  showCompletionSnackbar(
                                      scope = scope,
                                      snackbarHostState = snackbarHostState,
                                      product = product,
                                      isCompleted = true,
+                                     markLabel = completionLabelFor(newType),
                                      onUndo = {
-                                         viewModel.toggleProductCompletion(product.id, false)
+                                         viewModel.toggleProductCompletion(product.id, wasCompleted, wasType)
                                      },
                                      isLongPress = true
                                  )
@@ -257,17 +263,18 @@ fun HomeScreen(
             ProductDetailSheet(
                 product = selectedProduct!!,
                 onMarkComplete = {
-                    viewModel.toggleProductCompletion(
-                        selectedProduct!!.id,
-                        !selectedProduct!!.isCompleted
-                    )
+                    val target = selectedProduct!!
+                    val targetCompleted = !target.isCompleted
+                    val type = if (targetCompleted) completionTypeFor(target) else null
+                    viewModel.toggleProductCompletion(target.id, targetCompleted, type)
                     showCompletionSnackbar(
                         scope = scope,
                         snackbarHostState = snackbarHostState,
-                        product = selectedProduct!!,
-                        isCompleted = !selectedProduct!!.isCompleted,
+                        product = target,
+                        isCompleted = targetCompleted,
+                        markLabel = if (targetCompleted) completionLabelFor(type) else null,
                         onUndo = {
-                            viewModel.toggleProductCompletion(selectedProduct!!.id, false)
+                            viewModel.toggleProductCompletion(target.id, false, null)
                         }
                     )
                     selectedProduct = null
@@ -293,10 +300,11 @@ private fun showCompletionSnackbar(
     product: ProductEntity,
     isCompleted: Boolean,
     onUndo: () -> Unit,
-    isLongPress: Boolean = false
+    isLongPress: Boolean = false,
+    markLabel: String? = null
 ) {
     scope.launch {
-        val actionLabel = markActionLabel(product)
+        val actionLabel = markLabel ?: markActionLabel(product)
         val triggerText = if (isLongPress) "长按" else "滑动"
         val message = if (isCompleted) {
             "已「$triggerText」标记「${product.name}」$actionLabel"
@@ -328,16 +336,51 @@ private fun markActionLabel(product: ProductEntity): String {
 }
 
 /**
- * 已完成标签文字（用于绿色已处理徽标）
- * 可下架 → 已下架；可退货 → 已退货处理；其余 → 已处理
+ * 根据当前状态返回标记完成时应写入的 completedType
+ * 可下架 → TAKE_DOWN；可退货 → RETURN；其余 → null（普通完成）
  */
-private fun completedLabelFor(product: ProductEntity): String {
+private fun completionTypeFor(product: ProductEntity): String? {
     val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
     return when (status) {
-        is ProductStatus.TakeDown -> "已下架"
-        is ProductStatus.Returnable -> "已退货处理"
+        is ProductStatus.TakeDown -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
+        is ProductStatus.Returnable -> ProductEntity.COMPLETED_TYPE_RETURN
+        else -> null
+    }
+}
+
+/**
+ * 长按切换后的 completedType：
+ * 已标记「下架」→「退货处理」；已标记「退货处理」→「下架」；
+ * 未标记时按当前状态写入对应的 completedType
+ */
+private fun toggledCompletionType(product: ProductEntity): String? {
+    if (product.isCompleted) {
+        return when (product.completedType) {
+            ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> ProductEntity.COMPLETED_TYPE_RETURN
+            ProductEntity.COMPLETED_TYPE_RETURN -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
+            else -> completionTypeFor(product)
+        }
+    }
+    return completionTypeFor(product)
+}
+
+/**
+ * completedType 对应的已处理标签文字
+ */
+private fun completionLabelFor(type: String?): String {
+    return when (type) {
+        ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> "已下架"
+        ProductEntity.COMPLETED_TYPE_RETURN -> "已退货处理"
         else -> "已处理"
     }
+}
+
+/**
+ * 已完成标签文字（用于绿色已处理徽标）
+ * 优先读取 completedType：已下架 / 已退货处理 / 已处理
+ */
+private fun completedLabelFor(product: ProductEntity): String {
+    return completionLabelFor(product.completedType)
 }
 
 /**
@@ -714,7 +757,7 @@ private fun TaskCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     if (!isCompleted) {
                         Text(
-                            text = "· 长按同效",
+                            text = "· 长按切换标记",
                             style = MaterialTheme.typography.labelSmall,
                             color = Green500.copy(alpha = 0.7f)
                         )

@@ -207,10 +207,11 @@ class ProductRepository(
 
     /**
      * 切换产品的完成状态，返回 Result 包装结果
+     * completedType 区分处理方式：已下架 / 已退货处理 / null 未完成
      */
-    suspend fun toggleCompletion(id: Long, isCompleted: Boolean): Result<Unit> {
+    suspend fun toggleCompletion(id: Long, isCompleted: Boolean, completedType: String? = null): Result<Unit> {
         return try {
-            productDao.updateCompletionStatus(id, isCompleted)
+            productDao.updateCompletionStatus(id, isCompleted, completedType)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

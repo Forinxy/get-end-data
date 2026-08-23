@@ -305,8 +305,23 @@ class ProductListViewModel @Inject constructor(
         viewModelScope.launch {
             val product = _uiState.value.products.firstOrNull { it.id == productId }
             product?.let {
-                repository.toggleCompletion(productId, !it.isCompleted)
+                val completed = !it.isCompleted
+                val type = if (completed) completionTypeFor(it) else null
+                repository.toggleCompletion(productId, completed, type)
             }
+        }
+    }
+
+    /**
+     * 根据当前状态返回标记完成时应写入的 completedType
+     * 可下架 → TAKE_DOWN；可退货 → RETURN；其余 → null（普通完成）
+     */
+    private fun completionTypeFor(product: ProductEntity): String? {
+        val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
+        return when (status) {
+            is ProductStatus.TakeDown -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
+            is ProductStatus.Returnable -> ProductEntity.COMPLETED_TYPE_RETURN
+            else -> null
         }
     }
 

@@ -180,14 +180,25 @@ fun ProductCard(
                     )
                 }
 
-                // 状态标签：已处理时显示绿色"已处理"
+                // 状态标签：已处理时显示绿色处理徽标（已下架/已退货处理/已处理）
                 if (isCompleted) {
-                    StatusBadgeCompleted()
+                    StatusBadgeCompleted(label = completedLabelFor(product))
                 } else {
                     StatusBadge(status = status)
                 }
             }
         }
+    }
+}
+
+/**
+ * completedType 对应的已处理标签文字
+ */
+private fun completedLabelFor(product: ProductEntity): String {
+    return when (product.completedType) {
+        ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> "已下架"
+        ProductEntity.COMPLETED_TYPE_RETURN -> "已退货处理"
+        else -> "已处理"
     }
 }
 

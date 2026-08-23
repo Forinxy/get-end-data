@@ -21,5 +21,11 @@ data class ProductEntity(
     val updatedAt: Long = System.currentTimeMillis(),   // 更新时间
     val deletedAt: Long? = null,                        // 删除时间（软删除标记）
     val isCompleted: Boolean = false,                   // 是否已完成
-    val completedAt: Long? = null                       // 完成时间（isCompleted 为 true 时记录）
-)
+    val completedAt: Long? = null,                      // 完成时间（isCompleted 为 true 时记录）
+    val completedType: String? = null                   // 完成类型："TAKE_DOWN"已下架 / "RETURN"已退货处理 / null 未完成
+) {
+    companion object {
+        const val COMPLETED_TYPE_TAKE_DOWN = "TAKE_DOWN"
+        const val COMPLETED_TYPE_RETURN = "RETURN"
+    }
+}

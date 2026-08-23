@@ -14,7 +14,7 @@ import java.time.ZoneId
 /**
  * 日期选择对话框，包装 Material3 DatePickerDialog。
  *
- * 只选几月几日，年份固定为今年（默认自动填充当年）。
+ * 默认初始年份为今年，可自由调整到其他年份。
  *
  * @param initialDate 初始选中日期，默认为今天
  * @param onDateSelected 选中日期回调
@@ -29,9 +29,9 @@ fun DatePickerDialog(
 ) {
     val now = LocalDate.now()
 
-    // 年份固定为今年，仅保留初始日期的月/日（闰年 2/29 在当前非闰年时回退到今天）
+    // 保留初始日期的月/日（闰年 2/29 在当前非闰年时回退到今天）
     val pickerDate = try {
-        LocalDate.of(now.year, initialDate.monthValue, initialDate.dayOfMonth)
+        LocalDate.of(initialDate.year, initialDate.monthValue, initialDate.dayOfMonth)
     } catch (_: Exception) {
         now
     }
@@ -42,9 +42,10 @@ fun DatePickerDialog(
         .toInstant()
         .toEpochMilli()
 
+    // 允许选择任意年份（默认选中今年）
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = initialMillis,
-        yearRange = now.year..now.year
+        yearRange = now.year - 100..now.year + 100
     )
 
     DatePickerDialog(

@@ -391,8 +391,10 @@ fun ProductListScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     if (product.isCompleted) {
-                        // 已处理标签
-                        com.expiryguard.app.ui.components.StatusBadgeCompleted()
+                        // 已处理标签：已下架 / 已退货处理 / 已处理
+                        com.expiryguard.app.ui.components.StatusBadgeCompleted(
+                            label = completedLabelFor(product)
+                        )
                     } else {
                         com.expiryguard.app.ui.components.StatusBadge(status = status)
                     }
@@ -576,13 +578,23 @@ fun ProductListScreen(
     }
 }
 
+/**
+ * completedType 对应的已处理标签文字
+ */
+private fun completedLabelFor(product: ProductEntity): String {
+    return when (product.completedType) {
+        ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> "已下架"
+        ProductEntity.COMPLETED_TYPE_RETURN -> "已退货处理"
+        else -> "已处理"
+    }
+}
+
 @Composable
 private fun DetailInfoRow(
     label: String,
     value: String,
     valueColor: Color = MaterialTheme.colorScheme.onSurface
-) {
-    Row(
+) {    Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {

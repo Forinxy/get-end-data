@@ -166,10 +166,11 @@ class HomeViewModel @Inject constructor(
 
     /**
      * 切换清单的完成状态
+     * @param completedType 完成类型：TAKE_DOWN 已下架 / RETURN 已退货处理 / null 未完成或旧数据
      */
-    fun toggleProductCompletion(productId: Long, isCompleted: Boolean) {
+    fun toggleProductCompletion(productId: Long, isCompleted: Boolean, completedType: String? = null) {
         viewModelScope.launch {
-            repository.toggleCompletion(productId, isCompleted)
+            repository.toggleCompletion(productId, isCompleted, completedType)
         }
     }
 }

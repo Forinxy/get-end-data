@@ -25,10 +25,11 @@ import java.io.File
  * v2 - 新增 isCompleted 字段（ProductEntity）
  * v3 - 新增 shelf_life_groups 表（ShelfLifeGroupEntity）
  * v4 - 新增 completedAt 字段（ProductEntity），用于区分今日/历史已完成
+ * v5 - 新增 completedType 字段（ProductEntity），区分已下架/已退货处理
  */
 @Database(
     entities = [ProductEntity::class, CategoryEntity::class, ShelfLifeGroupEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +47,15 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE products ADD COLUMN completedAt INTEGER")
+            }
+        }
+
+        /**
+         * v4 -> v5 迁移：products 表新增 completedType 列，区分已下架/已退货处理
+         */
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE products ADD COLUMN completedType TEXT")
             }
         }
 
@@ -79,7 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_3_4)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
