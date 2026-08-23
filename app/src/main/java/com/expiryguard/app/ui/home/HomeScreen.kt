@@ -208,16 +208,7 @@ fun HomeScreen(
                              onTaskCompleted = { product, isCompleted ->
                                  val type = if (isCompleted) completionTypeFor(product) else null
                                  viewModel.toggleProductCompletion(product.id, isCompleted, type)
-                                 showCompletionSnackbar(
-                                     scope = scope,
-                                     snackbarHostState = snackbarHostState,
-                                     product = product,
-                                     isCompleted = isCompleted,
-                                     markLabel = if (isCompleted) completionLabelFor(type) else null,
-                                     onUndo = {
-                                         viewModel.toggleProductCompletion(product.id, false, null)
-                                     }
-                                 )
+                                 // 滑动标记静默完成，不再弹出底部提示（避免频繁弹窗碍眼）
                              },
                              onTaskLongPress = { product ->
                                  val wasCompleted = product.isCompleted
@@ -706,7 +697,7 @@ private fun TaskCard(
         else -> "滑动标记完成"
     }
 
-    // 滑动阈值：需滑动超过卡片宽度的 65% 才触发，避免轻滑误触
+    // 滑动阈值：需滑动超过卡片宽度的 85% 才触发，增加阻尼感，避免轻滑误触
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.StartToEnd || value == SwipeToDismissBoxValue.EndToStart) {
@@ -715,7 +706,7 @@ private fun TaskCard(
             }
             false
         },
-        positionalThreshold = { totalDistance -> totalDistance * 0.65f }
+        positionalThreshold = { totalDistance -> totalDistance * 0.85f }
     )
 
     SwipeToDismissBox(

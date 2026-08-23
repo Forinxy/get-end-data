@@ -66,3 +66,13 @@ Entries discovered by the Agent during task execution should follow this format:
   - 长按切换逻辑：已完成商品在「已下架」↔「已退货处理」之间切换 completedType；未完成商品按当前状态写入对应 completedType
   - 滑动标记完成时也应写入 completedType（按状态），保证列表/首页标签一致
   - 日期选择器 yearRange 放开至 now.year±100，初始日期保留原年份（不再强制今年）
+
+[Project Knowledge Summary]
+- Date: 2026-08-23
+- Context: Discovered by Agent while fixing 用户数据丢失 + 备份恢复失败
+- Category: Troubleshooting & Debugging
+- Instructions:
+  - 严重教训：fallbackToDestructiveMigration() 在迁移链断裂时会清空全部数据，绝不能用于生产环境
+  - 旧代码仅在 version < 3 时备份，v4→v5 升级未受保护；改为 backupDatabaseOnUpgrade：任何版本变化都先备份旧库到 filesDir/legacy_db_backup 和 Download/ExpiryGuard
+  - 数据库升级安全三原则：① 永不使用 destructive 兜底 ② 升级前自动备份旧库文件 ③ 备份文件导出到公共目录供用户手动找回
+  - 恢复失败可能原因：备份 JSON 字段与当前实体不兼容（Gson JsonSyntaxException）；已增加详细错误提示
