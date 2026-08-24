@@ -203,8 +203,8 @@ fun HomeScreen(
                         todayTasksSection(
                             todayExpiry = uiState.todayExpiry,
                             warning = uiState.warning,
-                            todayCompleted = uiState.todayCompleted,
-                            previousCompleted = uiState.previousCompleted,
+                            takeDownCompleted = uiState.takeDownCompleted,
+                            processedCompleted = uiState.processedCompleted,
                              onTaskCompleted = { product, isCompleted ->
                                  val type = if (isCompleted) completionTypeFor(product) else null
                                  viewModel.toggleProductCompletion(product.id, isCompleted, type)
@@ -512,15 +512,15 @@ private fun SearchBar(
  * 今日待办区域 —— 显示今天到期 + 还剩1天的预警清单
  *
  * 支持左右滑动切换完成状态（左右方向均可标记/取消标记）。
- * 已处理区域按完成时间拆分为「今日已完成」与「之前已完成」两组。
+ * 已处理区域按标记类型拆分为「已下架」与「已处理」两组，便于快速查看。
  * 作为 LazyListScope 扩展函数在 LazyColumn 中懒加载，避免一次性渲染全部卡片。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 private fun LazyListScope.todayTasksSection(
     todayExpiry: List<ProductEntity>,
     warning: List<ProductEntity>,
-    todayCompleted: List<ProductEntity>,
-    previousCompleted: List<ProductEntity>,
+    takeDownCompleted: List<ProductEntity>,
+    processedCompleted: List<ProductEntity>,
     onTaskCompleted: (ProductEntity, Boolean) -> Unit,
     onTaskClick: (ProductEntity) -> Unit,
     onTaskLongPress: (ProductEntity) -> Unit
@@ -561,7 +561,7 @@ private fun LazyListScope.todayTasksSection(
         }
     }
 
-    if (todayTasks.isEmpty() && todayCompleted.isEmpty() && previousCompleted.isEmpty()) {
+    if (todayTasks.isEmpty() && takeDownCompleted.isEmpty() && processedCompleted.isEmpty()) {
         // 空状态
         item(key = "today_empty") {
             GlassCard(
@@ -594,9 +594,9 @@ private fun LazyListScope.todayTasksSection(
             )
         }
 
-        // 今日已完成（今天处理过的记录）
-        if (todayCompleted.isNotEmpty()) {
-            item(key = "today_completed_header") {
+        // 已下架分组
+        if (takeDownCompleted.isNotEmpty()) {
+            item(key = "take_down_completed_header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -604,21 +604,21 @@ private fun LazyListScope.todayTasksSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "今日已完成",
+                        text = "已下架",
                         style = MaterialTheme.typography.titleSmall,
-                        color = Green500,
+                        color = Red500,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = "${todayCompleted.size} 项",
+                        text = "${takeDownCompleted.size} 项",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Green500.copy(alpha = 0.7f)
+                        color = Red500.copy(alpha = 0.7f)
                     )
                 }
             }
             items(
-                items = todayCompleted.sortedByDescending { it.completedAt ?: 0L },
+                items = takeDownCompleted,
                 key = { it.id }
             ) { product ->
                 TaskCard(
@@ -633,9 +633,9 @@ private fun LazyListScope.todayTasksSection(
             }
         }
 
-        // 之前已完成（历史处理过的记录，折叠展示避免占据首页过多空间）
-        if (previousCompleted.isNotEmpty()) {
-            item(key = "previous_completed_header") {
+        // 已处理分组
+        if (processedCompleted.isNotEmpty()) {
+            item(key = "processed_completed_header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -643,21 +643,21 @@ private fun LazyListScope.todayTasksSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "之前已完成",
+                        text = "已处理",
                         style = MaterialTheme.typography.titleSmall,
-                        color = Gray500,
+                        color = Green500,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = "${previousCompleted.size} 项",
+                        text = "${processedCompleted.size} 项",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Gray500.copy(alpha = 0.7f)
+                        color = Green500.copy(alpha = 0.7f)
                     )
                 }
             }
             items(
-                items = previousCompleted.sortedByDescending { it.completedAt ?: 0L }.take(20),
+                items = processedCompleted,
                 key = { it.id }
             ) { product ->
                 TaskCard(

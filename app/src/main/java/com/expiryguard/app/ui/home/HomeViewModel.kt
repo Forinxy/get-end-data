@@ -21,13 +21,13 @@ import javax.inject.Inject
  *
  * @property todayExpiry 今日到期的清单列表（含可退货）
  * @property warning 预警清单列表（还有1天到期）
- * @property todayCompleted 今日已完成的清单列表
- * @property previousCompleted 之前（历史）已完成的清单列表
+ * @property takeDownCompleted 已下架的清单列表
+ * @property processedCompleted 已处理的清单列表
  * @property pendingProducts 待处理的清单列表（剩余未完成）
  * @property todayCount 今日到期数量
  * @property warningCount 预警数量
- * @property todayCompletedCount 今日已完成数量
- * @property previousCompletedCount 历史已完成数量
+ * @property takeDownCompletedCount 已下架数量
+ * @property processedCompletedCount 已处理数量
  * @property pendingCount 待处理数量
  * @property recentProducts 最近添加的5个清单
  * @property totalCount 清单总数
@@ -36,13 +36,13 @@ import javax.inject.Inject
 data class HomeUiState(
     val todayExpiry: List<ProductEntity> = emptyList(),
     val warning: List<ProductEntity> = emptyList(),
-    val todayCompleted: List<ProductEntity> = emptyList(),
-    val previousCompleted: List<ProductEntity> = emptyList(),
+    val takeDownCompleted: List<ProductEntity> = emptyList(),
+    val processedCompleted: List<ProductEntity> = emptyList(),
     val pendingProducts: List<ProductEntity> = emptyList(),
     val todayCount: Int = 0,
     val warningCount: Int = 0,
-    val todayCompletedCount: Int = 0,
-    val previousCompletedCount: Int = 0,
+    val takeDownCompletedCount: Int = 0,
+    val processedCompletedCount: Int = 0,
     val pendingCount: Int = 0,
     val recentProducts: List<ProductEntity> = emptyList(),
     val totalCount: Int = 0,
@@ -118,16 +118,19 @@ class HomeViewModel @Inject constructor(
         val warning = groups.warning
 
         // 已处理：仅保留今日到期、可下架、预警、已过期或可退货的已完成清单
-        // 按完成时间拆分为「今日已完成」与「之前已完成」
+        // 按 completedType 拆分为「已下架」与「已处理」两个分组
         val completed = products.filter { product ->
             if (!product.isCompleted) return@filter false
             val days = DateUtils.daysBetween(today, product.expiryDate)
             if (days <= 1) return@filter true
             val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
             status is ProductStatus.Returnable || status is ProductStatus.TakeDown
+        }.sortedByDescending { it.completedAt ?: 0L }
+        val takeDownCompleted = completed.filter {
+            it.completedType == ProductEntity.COMPLETED_TYPE_TAKE_DOWN
         }
-        val (todayCompleted, previousCompleted) = completed.partition { product ->
-            product.completedAt != null && DateUtils.isToday(product.completedAt!!)
+        val processedCompleted = completed.filter {
+            it.completedType != ProductEntity.COMPLETED_TYPE_TAKE_DOWN
         }
 
         // 待处理：剩下的未完成清单（排除今日到期、可退货、预警）
@@ -142,13 +145,13 @@ class HomeViewModel @Inject constructor(
         return HomeUiState(
             todayExpiry = todayWithReturnable,
             warning = warning,
-            todayCompleted = todayCompleted,
-            previousCompleted = previousCompleted,
+            takeDownCompleted = takeDownCompleted,
+            processedCompleted = processedCompleted,
             pendingProducts = pending,
             todayCount = todayWithReturnable.size,
             warningCount = warning.size,
-            todayCompletedCount = todayCompleted.size,
-            previousCompletedCount = previousCompleted.size,
+            takeDownCompletedCount = takeDownCompleted.size,
+            processedCompletedCount = processedCompleted.size,
             pendingCount = pending.size,
             recentProducts = recent,
             totalCount = products.size,
