@@ -509,6 +509,13 @@ private fun SearchBar(
 }
 
 /**
+ * 已完成分组最多渲染的条数。
+ * 首页仅展示最近完成的若干条，避免大量历史已完成卡片（SwipeToDismissBox + GlassCard + AsyncImage）
+ * 同时渲染导致卡顿；完整历史仍可在统计页/清单页查看。
+ */
+private const val MAX_COMPLETED_ITEMS_PER_GROUP = 20
+
+/**
  * 今日待办区域 —— 显示今天到期 + 还剩1天的预警清单
  *
  * 支持左右滑动切换完成状态（左右方向均可标记/取消标记）。
@@ -618,7 +625,7 @@ private fun LazyListScope.todayTasksSection(
                 }
             }
             items(
-                items = takeDownCompleted,
+                items = takeDownCompleted.take(MAX_COMPLETED_ITEMS_PER_GROUP),
                 key = { it.id }
             ) { product ->
                 TaskCard(
@@ -657,7 +664,7 @@ private fun LazyListScope.todayTasksSection(
                 }
             }
             items(
-                items = processedCompleted,
+                items = processedCompleted.take(MAX_COMPLETED_ITEMS_PER_GROUP),
                 key = { it.id }
             ) { product ->
                 TaskCard(
