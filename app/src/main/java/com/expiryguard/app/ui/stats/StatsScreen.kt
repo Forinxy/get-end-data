@@ -57,6 +57,12 @@ import com.expiryguard.app.ui.theme.Red500
 import com.expiryguard.app.ui.theme.Yellow500
 import com.expiryguard.app.util.DateUtils
 
+/** 已下架标记颜色（深红） */
+private val TakeDownColor = Color(0xFFB91C1C)
+
+/** 已处理标记颜色（深绿） */
+private val ProcessedColor = Color(0xFF15803D)
+
 /**
  * 获取产品状态对应的颜色
  */
@@ -171,6 +177,26 @@ fun StatsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            GlassStatCard(
+                                label = "已下架",
+                                value = uiState.takeDownCount.toString(),
+                                color = Red500,
+                                statusColor = Red500,
+                                modifier = Modifier.weight(1f)
+                            )
+                            GlassStatCard(
+                                label = "已处理",
+                                value = uiState.processedCount.toString(),
+                                color = Green500,
+                                statusColor = Green500,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
 
                     // 状态分布横条
@@ -186,6 +212,8 @@ fun StatsScreen(
                             expiringCount = uiState.expiringCount,
                             returnableCount = uiState.returnableCount,
                             expiredCount = uiState.expiredCount,
+                            takeDownCount = uiState.takeDownCount,
+                            processedCount = uiState.processedCount,
                             totalCount = uiState.totalCount
                         )
                     }
@@ -203,6 +231,8 @@ fun StatsScreen(
                             expiringCount = uiState.expiringCount,
                             returnableCount = uiState.returnableCount,
                             expiredCount = uiState.expiredCount,
+                            takeDownCount = uiState.takeDownCount,
+                            processedCount = uiState.processedCount,
                             totalCount = uiState.totalCount
                         )
                     }
@@ -300,6 +330,8 @@ private fun StatusDistributionBar(
     expiringCount: Int,
     returnableCount: Int,
     expiredCount: Int,
+    takeDownCount: Int,
+    processedCount: Int,
     totalCount: Int
 ) {
     val total = totalCount.coerceAtLeast(1)
@@ -327,6 +359,8 @@ private fun StatusDistributionBar(
                     val expiringRatio = expiringCount.toFloat() / total
                     val returnableRatio = returnableCount.toFloat() / total
                     val expiredRatio = expiredCount.toFloat() / total
+                    val takeDownRatio = takeDownCount.toFloat() / total
+                    val processedRatio = processedCount.toFloat() / total
 
                     if (safeRatio > 0f) {
                         Box(
@@ -360,20 +394,48 @@ private fun StatusDistributionBar(
                                 .background(Red500)
                         )
                     }
+                    if (takeDownRatio > 0f) {
+                        Box(
+                            modifier = Modifier
+                                .weight(takeDownRatio)
+                                .fillMaxSize()
+                                .background(TakeDownColor)
+                        )
+                    }
+                    if (processedRatio > 0f) {
+                        Box(
+                            modifier = Modifier
+                                .weight(processedRatio)
+                                .fillMaxSize()
+                                .background(ProcessedColor)
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 图例
-            Row(
+            // 图例（两行，每行 3 个）
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                LegendItem(color = Green500, label = "安全", count = safeCount)
-                LegendItem(color = Yellow500, label = "即将到期", count = expiringCount)
-                LegendItem(color = Blue500, label = "可退货", count = returnableCount)
-                LegendItem(color = Red500, label = "已过期", count = expiredCount)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    LegendItem(color = Green500, label = "安全", count = safeCount)
+                    LegendItem(color = Yellow500, label = "即将到期", count = expiringCount)
+                    LegendItem(color = Blue500, label = "可退货", count = returnableCount)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    LegendItem(color = Red500, label = "已过期", count = expiredCount)
+                    LegendItem(color = TakeDownColor, label = "已下架", count = takeDownCount)
+                    LegendItem(color = ProcessedColor, label = "已处理", count = processedCount)
+                }
             }
         }
     }
@@ -416,6 +478,8 @@ private fun DonutChart(
     expiringCount: Int,
     returnableCount: Int,
     expiredCount: Int,
+    takeDownCount: Int,
+    processedCount: Int,
     totalCount: Int
 ) {
     val total = totalCount.coerceAtLeast(1)
@@ -424,7 +488,9 @@ private fun DonutChart(
         PieSlice("安全", safeCount, Green500),
         PieSlice("即将到期", expiringCount, Yellow500),
         PieSlice("可退货", returnableCount, Blue500),
-        PieSlice("已过期", expiredCount, Red500)
+        PieSlice("已过期", expiredCount, Red500),
+        PieSlice("已下架", takeDownCount, TakeDownColor),
+        PieSlice("已处理", processedCount, ProcessedColor)
     )
 
     GlassCard(
@@ -639,7 +705,14 @@ private fun ProductDetailRow(
     product: ProductEntity,
     status: ProductStatus
 ) {
-    val statusColor = getStatusColor(status)
+    // 已完成清单显示已下架/已处理标记
+    val isCompleted = product.isCompleted
+    val completedColor = when {
+        isCompleted && product.completedType == ProductEntity.COMPLETED_TYPE_TAKE_DOWN -> TakeDownColor
+        isCompleted -> ProcessedColor
+        else -> getStatusColor(status)
+    }
+    val statusColor = completedColor
 
     GlassCard(
         shape = RoundedCornerShape(12.dp),
@@ -683,34 +756,50 @@ private fun ProductDetailRow(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 状态标签（可退货时显示退货时间信息）
-            if (status is ProductStatus.Returnable) {
-                val returnDeadlineDays = (status.remainingDays - status.threshold).coerceAtLeast(0)
-                Column(horizontalAlignment = Alignment.End) {
+            // 状态标签（已完成显示已下架/已处理，可退货显示退货时间信息）
+            when {
+                isCompleted -> {
+                    val label = if (product.completedType == ProductEntity.COMPLETED_TYPE_TAKE_DOWN) {
+                        "已下架"
+                    } else {
+                        "已处理"
+                    }
                     Text(
-                        text = "可退货",
+                        text = label,
                         fontSize = 12.sp,
                         color = statusColor,
                         fontWeight = FontWeight.Medium
                     )
+                }
+                status is ProductStatus.Returnable -> {
+                    val returnDeadlineDays = (status.remainingDays - status.threshold).coerceAtLeast(0)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "可退货",
+                            fontSize = 12.sp,
+                            color = statusColor,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "剩余退货${returnDeadlineDays}天",
+                            fontSize = 10.sp,
+                            color = statusColor.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = "到期还有${status.remainingDays}天",
+                            fontSize = 10.sp,
+                            color = statusColor.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                else -> {
                     Text(
-                        text = "剩余退货${returnDeadlineDays}天",
-                        fontSize = 10.sp,
-                        color = statusColor.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = "到期还有${status.remainingDays}天",
-                        fontSize = 10.sp,
-                        color = statusColor.copy(alpha = 0.7f)
+                        text = getStatusLabel(status),
+                        fontSize = 12.sp,
+                        color = statusColor,
+                        fontWeight = FontWeight.Medium
                     )
                 }
-            } else {
-                Text(
-                    text = getStatusLabel(status),
-                    fontSize = 12.sp,
-                    color = statusColor,
-                    fontWeight = FontWeight.Medium
-                )
             }
         }
     }

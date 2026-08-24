@@ -14,10 +14,13 @@ import javax.inject.Inject
  */
 data class StatsUiState(
     val totalCount: Int = 0,
+    val activeCount: Int = 0,
     val safeCount: Int = 0,
     val expiringCount: Int = 0,
     val returnableCount: Int = 0,
     val expiredCount: Int = 0,
+    val takeDownCount: Int = 0,
+    val processedCount: Int = 0,
     val categoryDistribution: List<com.expiryguard.app.data.db.dao.CategoryCount> = emptyList(),
     val expiryDistribution: List<com.expiryguard.app.data.db.dao.ExpiryCount> = emptyList(),
     val products: List<ProductEntity> = emptyList(),
@@ -40,9 +43,18 @@ class StatsViewModel @Inject constructor(
 
     private fun loadStats() {
         viewModelScope.launch {
-            // 收集所有清单数据并计算统计（排除已处理的清单）
+            // 收集所有清单数据并计算统计（含已下架/已处理的已标记清单）
             repository.getAllActiveProducts().collect { allProducts ->
-                // 排除已完成的清单
+                // 已标记的清单（已下架 / 已处理）
+                val completed = allProducts.filter { it.isCompleted }
+                val takeDownCount = completed.count {
+                    it.completedType == ProductEntity.COMPLETED_TYPE_TAKE_DOWN
+                }
+                val processedCount = completed.count {
+                    it.completedType != ProductEntity.COMPLETED_TYPE_TAKE_DOWN
+                }
+
+                // 未处理的清单（用于状态分布统计）
                 val products = allProducts.filter { !it.isCompleted }
                 var safe = 0
                 var expiring = 0
@@ -62,14 +74,17 @@ class StatsViewModel @Inject constructor(
                 }
 
                 _uiState.value = StatsUiState(
-                    totalCount = products.size,
+                    totalCount = allProducts.size,
+                    activeCount = products.size,
                     safeCount = safe,
                     expiringCount = expiring,
                     returnableCount = returnable,
                     expiredCount = expired,
+                    takeDownCount = takeDownCount,
+                    processedCount = processedCount,
                     categoryDistribution = emptyList(),
                     expiryDistribution = emptyList(),
-                    products = products,
+                    products = allProducts,
                     isLoading = false
                 )
             }
