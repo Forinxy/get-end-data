@@ -300,28 +300,15 @@ class ProductListViewModel @Inject constructor(
 
     /**
      * 切换清单完成状态
+     * 清单页按钮统一标记为「已处理」；取消时清空类型
      */
     fun swipeComplete(productId: Long) {
         viewModelScope.launch {
             val product = _uiState.value.products.firstOrNull { it.id == productId }
             product?.let {
                 val completed = !it.isCompleted
-                val type = if (completed) completionTypeFor(it) else null
-                repository.toggleCompletion(productId, completed, type)
+                repository.toggleCompletion(productId, completed, null)
             }
-        }
-    }
-
-    /**
-     * 根据当前状态返回标记完成时应写入的 completedType
-     * 可下架 → TAKE_DOWN；可退货 → RETURN；其余 → null（普通完成）
-     */
-    private fun completionTypeFor(product: ProductEntity): String? {
-        val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
-        return when (status) {
-            is ProductStatus.TakeDown -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
-            is ProductStatus.Returnable -> ProductEntity.COMPLETED_TYPE_RETURN
-            else -> null
         }
     }
 

@@ -206,7 +206,7 @@ fun HomeScreen(
                             takeDownCompleted = uiState.takeDownCompleted,
                             processedCompleted = uiState.processedCompleted,
                              onTaskCompleted = { product, isCompleted ->
-                                 val type = if (isCompleted) completionTypeFor(product) else null
+                                 val type = if (isCompleted) ProductEntity.COMPLETED_TYPE_TAKE_DOWN else null
                                  viewModel.toggleProductCompletion(product.id, isCompleted, type)
                                  // 滑动标记静默完成，不再弹出底部提示（避免频繁弹窗碍眼）
                              },
@@ -256,14 +256,13 @@ fun HomeScreen(
                 onMarkComplete = {
                     val target = selectedProduct!!
                     val targetCompleted = !target.isCompleted
-                    val type = if (targetCompleted) completionTypeFor(target) else null
-                    viewModel.toggleProductCompletion(target.id, targetCompleted, type)
+                    viewModel.toggleProductCompletion(target.id, targetCompleted, null)
                     showCompletionSnackbar(
                         scope = scope,
                         snackbarHostState = snackbarHostState,
                         product = target,
                         isCompleted = targetCompleted,
-                        markLabel = if (targetCompleted) completionLabelFor(type) else null,
+                        markLabel = if (targetCompleted) "已处理" else null,
                         onUndo = {
                             viewModel.toggleProductCompletion(target.id, false, null)
                         }
@@ -283,7 +282,7 @@ fun HomeScreen(
 /**
  * 展示标记完成/取消完成的提示，并提供撤销入口，防止误触
  *
- * 处理方式按状态区分：可下架 → 下架；可退货 → 退货处理；其余 → 完成
+ * 长按与详情按钮标记「已处理」，滑动标记「已下架」
  */
 private fun showCompletionSnackbar(
     scope: kotlinx.coroutines.CoroutineScope,
@@ -295,7 +294,7 @@ private fun showCompletionSnackbar(
     markLabel: String? = null
 ) {
     scope.launch {
-        val actionLabel = markLabel ?: markActionLabel(product)
+        val actionLabel = markLabel ?: "已处理"
         val triggerText = if (isLongPress) "长按" else "滑动"
         val message = if (isCompleted) {
             "已「$triggerText」标记「${product.name}」$actionLabel"
@@ -314,35 +313,8 @@ private fun showCompletionSnackbar(
 }
 
 /**
- * 处理动作文字（用于滑动提示与完成提示）
- * 可下架 → 下架；可退货 → 退货处理；其余 → 完成
- */
-private fun markActionLabel(product: ProductEntity): String {
-    val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
-    return when (status) {
-        is ProductStatus.TakeDown -> "下架"
-        is ProductStatus.Returnable -> "退货处理"
-        else -> "完成"
-    }
-}
-
-/**
- * 根据当前状态返回标记完成时应写入的 completedType
- * 可下架 → TAKE_DOWN；可退货 → RETURN；其余 → null（普通完成）
- */
-private fun completionTypeFor(product: ProductEntity): String? {
-    val status = ExpiryRuleEngine.calculateStatus(product.shelfLifeDays, product.expiryDate)
-    return when (status) {
-        is ProductStatus.TakeDown -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
-        is ProductStatus.Returnable -> ProductEntity.COMPLETED_TYPE_RETURN
-        else -> null
-    }
-}
-
-/**
  * 长按切换后的 completedType：
- * 已标记「下架」→「已处理」；已标记「已处理」→「下架」；
- * 未标记时按当前状态写入对应的 completedType
+ * 长按标记为「已处理」；已标记「下架」→「已处理」；已标记「已处理」→「下架」
  */
 private fun toggledCompletionType(product: ProductEntity): String? {
     if (product.isCompleted) {
@@ -352,7 +324,8 @@ private fun toggledCompletionType(product: ProductEntity): String? {
             else -> ProductEntity.COMPLETED_TYPE_TAKE_DOWN
         }
     }
-    return completionTypeFor(product)
+    // 未标记时长按直接标记为「已处理」
+    return null
 }
 
 /**
@@ -697,12 +670,8 @@ private fun TaskCard(
     // 已处理时用绿色压过原始状态色
     val statusColor = if (isCompleted) Green500 else statusToColor(productStatus)
 
-    // 滑动动作提示：可下架 → 下架；可退货 → 退货处理；其余 → 完成
-    val swipeLabel = when {
-        productStatus is ProductStatus.TakeDown -> "滑动标记下架"
-        productStatus is ProductStatus.Returnable -> "滑动标记退货"
-        else -> "滑动标记完成"
-    }
+    // 滑动动作提示：滑动一律标记下架
+    val swipeLabel = "滑动标记下架"
 
     // 滑动阈值：需滑动超过卡片宽度的 85% 才触发，增加阻尼感，避免轻滑误触
     val dismissState = rememberSwipeToDismissBoxState(
@@ -1106,13 +1075,8 @@ private fun ProductDetailSheet(
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            val markButtonLabel = when {
-                status is ProductStatus.TakeDown -> "标记已下架"
-                status is ProductStatus.Returnable -> "标记已退货处理"
-                else -> "标记已处理"
-            }
             Text(
-                text = if (product.isCompleted) "取消完成" else markButtonLabel,
+                text = if (product.isCompleted) "取消完成" else "标记已处理",
                 style = MaterialTheme.typography.titleSmall
             )
         }

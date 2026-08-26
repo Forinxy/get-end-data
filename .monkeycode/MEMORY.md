@@ -76,3 +76,12 @@ Entries discovered by the Agent during task execution should follow this format:
   - 旧代码仅在 version < 3 时备份，v4→v5 升级未受保护；改为 backupDatabaseOnUpgrade：任何版本变化都先备份旧库到 filesDir/legacy_db_backup 和 Download/ExpiryGuard
   - 数据库升级安全三原则：① 永不使用 destructive 兜底 ② 升级前自动备份旧库文件 ③ 备份文件导出到公共目录供用户手动找回
   - 恢复失败可能原因：备份 JSON 字段与当前实体不兼容（Gson JsonSyntaxException）；已增加详细错误提示
+
+[Project Knowledge Summary]
+- Date: 2026-08-26
+- Context: Discovered by Agent while implementing 滑动=下架、长按=已处理 语义
+- Category: Workflow & Collaboration
+- Instructions:
+  - 标记手势语义：滑动一律标记「已下架」(TAKE_DOWN)；长按标记「已处理」(null)，已标记时长按在「下架↔已处理」间切换
+  - 首页 TaskCard 滑动提示统一为「滑动标记下架」；详情弹层按钮统一为「标记已处理」；不再按商品状态推断 completedType（已删除 markActionLabel/completionTypeFor 辅助函数）
+  - ProductListViewModel.swipeComplete 统一传 null（已处理），不再按状态推断
